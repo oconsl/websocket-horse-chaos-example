@@ -350,6 +350,96 @@ a {
   transition: left 100ms linear;
 }
 
+/* ---- Power-ups (phase 4) ---- */
+
+.powerups-panel h2 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.powerups-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.powerup-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.powerup-card-button {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.powerup-card-button--selected {
+  border-color: #d4380d;
+}
+
+.powerup-card-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.powerup-emoji {
+  font-size: 1.2rem;
+}
+
+.powerup-used-tag {
+  font-size: 0.7rem;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.powerup-lane-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.lane-pick {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.lane-pick--selected {
+  border-color: #d4380d;
+  background: rgba(212, 56, 13, 0.1);
+}
+
+.powerup-submit {
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  border: none;
+  background: #d4380d;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.powerup-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .event-feed h2 {
   font-size: 1rem;
   margin-bottom: 0.5rem;

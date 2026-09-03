@@ -57,6 +57,29 @@ interface CoinsUpdatedPayload {
   reason: 'race_payout' | 'bailout';
 }
 
+type PowerUpType = 'TURBO' | 'SLOW' | 'BOMB' | 'SHIELD';
+
+interface PowerUp {
+  id: string;
+  type: PowerUpType;
+}
+
+interface PowerUpReceivedPayload {
+  raceId: string;
+  powerUps: PowerUp[];
+}
+
+interface GameErrorPayload {
+  message: string;
+}
+
+const POWER_UP_INFO: Record<PowerUpType, { emoji: string; label: string }> = {
+  TURBO: { emoji: '⚡', label: 'Turbo' },
+  SLOW: { emoji: '🐌', label: 'Lentitud' },
+  BOMB: { emoji: '💣', label: 'Bomba' },
+  SHIELD: { emoji: '🛡️', label: 'Escudo' },
+};
+
 interface RaceResults {
   raceId: string;
   status: RaceStatus;
@@ -88,6 +111,13 @@ export default function RacePage() {
   const [standings, setStandings] = useState<HorseFinish[] | null>(null);
   const [payout, setPayout] = useState<CoinsUpdatedPayload | null>(null);
   const [results, setResults] = useState<RaceResults | null>(null);
+
+  const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
+  const [usedPowerUpIds, setUsedPowerUpIds] = useState<Set<string>>(new Set());
+  const [selectedPowerUpId, setSelectedPowerUpId] = useState<string | null>(null);
+  const [selectedLane, setSelectedLane] = useState<number | null>(null);
+  const [powerUpError, setPowerUpError] = useState<string | null>(null);
+  const pendingPowerUpIdRef = useRef<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -138,6 +168,12 @@ export default function RacePage() {
       setStandings(null);
       setPayout(null);
       setResults(null);
+      setPowerUps([]);
+      setUsedPowerUpIds(new Set());
+      setSelectedPowerUpId(null);
+      setSelectedLane(null);
+      setPowerUpError(null);
+      pendingPowerUpIdRef.current = null;
     });
 
     socket.on('betting:closed', (payload: { raceId: string }) => {
@@ -189,6 +225,31 @@ export default function RacePage() {
       setPayout(payload);
     });
 
+    socket.on('powerup:received', (payload: PowerUpReceivedPayload) => {
+      setPowerUps(payload.powerUps);
+    });
+
+    // Server-authoritative: we optimistically mark a power-up used the
+    // moment we emit `powerup:use` (see usePowerUp below); this just clears
+    // the pending flag once the server confirms via race:event.
+    socket.on('race:event', () => {
+      pendingPowerUpIdRef.current = null;
+    });
+
+    socket.on('game:error', (payload: GameErrorPayload) => {
+      setPowerUpError(payload.message);
+      // Roll back the optimistic "used" mark if the server rejected our attempt.
+      const pendingId = pendingPowerUpIdRef.current;
+      if (pendingId) {
+        setUsedPowerUpIds((prev) => {
+          const next = new Set(prev);
+          next.delete(pendingId);
+          return next;
+        });
+        pendingPowerUpIdRef.current = null;
+      }
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
@@ -199,6 +260,16 @@ export default function RacePage() {
     const coins = session?.coins ?? 0;
     return Math.max(BET_STEP, Math.floor(coins / BET_STEP) * BET_STEP);
   }, [session?.coins]);
+
+  function usePowerUp(powerUpId: string) {
+    if (!selectedLane || !socketRef.current) return;
+    setPowerUpError(null);
+    setUsedPowerUpIds((prev) => new Set(prev).add(powerUpId));
+    pendingPowerUpIdRef.current = powerUpId;
+    socketRef.current.emit('powerup:use', { powerupId: powerUpId, lane: selectedLane });
+    setSelectedPowerUpId(null);
+    setSelectedLane(null);
+  }
 
   const horseNameByLane = useMemo(() => {
     const map = new Map<number, string>();
@@ -377,6 +448,62 @@ export default function RacePage() {
               })}
           </div>
 
+          {race.status === 'RACING' && powerUps.length > 0 && (
+            <div className="powerups-panel">
+              <h2>Tus poderes</h2>
+              {powerUpError && <p className="error">{powerUpError}</p>}
+              <ul className="powerups-list">
+                {powerUps.map((powerUp) => {
+                  const info = POWER_UP_INFO[powerUp.type];
+                  const isUsed = usedPowerUpIds.has(powerUp.id);
+                  const isSelected = selectedPowerUpId === powerUp.id;
+
+                  return (
+                    <li key={powerUp.id} className="powerup-card">
+                      <button
+                        type="button"
+                        className={`powerup-card-button${isSelected ? ' powerup-card-button--selected' : ''}`}
+                        disabled={isUsed}
+                        onClick={() => {
+                          setPowerUpError(null);
+                          setSelectedPowerUpId((prev) => (prev === powerUp.id ? null : powerUp.id));
+                          setSelectedLane(null);
+                        }}
+                      >
+                        <span className="powerup-emoji">{info.emoji}</span>
+                        <span>{info.label}</span>
+                        {isUsed && <span className="powerup-used-tag">usado</span>}
+                      </button>
+
+                      {isSelected && !isUsed && (
+                        <div className="powerup-lane-picker">
+                          {[1, 2, 3, 4, 5].map((lane) => (
+                            <button
+                              type="button"
+                              key={lane}
+                              className={`lane-pick${selectedLane === lane ? ' lane-pick--selected' : ''}`}
+                              onClick={() => setSelectedLane(lane)}
+                            >
+                              #{lane}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            className="powerup-submit"
+                            disabled={!selectedLane}
+                            onClick={() => usePowerUp(powerUp.id)}
+                          >
+                            USAR
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
           {events.length > 0 && (
             <div className="event-feed">
               <h2>Eventos</h2>
@@ -455,5 +582,27 @@ function describeEvent(event: RaceEventPayload, horseNameByLane: Map<number, str
     const name = horseNameByLane.get(lane) ?? `Caballo #${lane}`;
     return `🏁 ${name} llegó en el puesto ${place}°`;
   }
+
+  if (event.type.startsWith('powerup.')) {
+    const lane = event.lane as number;
+    const targetName = (event.horseName as string | null) ?? horseNameByLane.get(lane) ?? `carril ${lane}`;
+    const player = (event.playerUsername as string) ?? 'Alguien';
+
+    switch (event.type) {
+      case 'powerup.turbo':
+        return `⚡ ${player} le dio TURBO a ${targetName}`;
+      case 'powerup.slow':
+        return `🐌 ${player} ralentizó a ${targetName}`;
+      case 'powerup.bomb':
+        return `💣 ${player} bombardeó el carril ${lane} (${targetName})`;
+      case 'powerup.shield':
+        return `🛡️ ${player} protegió a ${targetName}`;
+      case 'powerup.blocked':
+        return `🛡️ ¡BLOQUEADA! ${targetName} estaba protegido del ataque de ${player}`;
+      default:
+        break;
+    }
+  }
+
   return `${event.type}: ${JSON.stringify(event)}`;
 }
