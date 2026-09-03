@@ -47,3 +47,127 @@ a {
     color-scheme: dark;
   }
 }
+
+/* ---- Horse Chaos: join / lobby / loading pages ---- */
+
+.loading-page {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.join-page {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.join-card {
+  width: 100%;
+  max-width: 360px;
+  padding: 2rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.join-card h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.join-card .subtitle {
+  opacity: 0.7;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.join-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.join-card input {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background: transparent;
+  color: inherit;
+  font-size: 1rem;
+}
+
+.join-card button {
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: none;
+  background: #d4380d;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.join-card button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  margin-top: 1rem;
+  color: #e5484d;
+  font-size: 0.9rem;
+}
+
+.lobby-page {
+  flex: 1;
+  padding: 2rem;
+  position: relative;
+}
+
+.player-badge {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 0.6rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  background: rgba(128, 128, 128, 0.08);
+}
+
+.badge-username {
+  font-weight: 700;
+}
+
+.badge-coins {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.player-count {
+  margin: 1rem 0;
+  opacity: 0.85;
+}
+
+.player-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 420px;
+}
+
+.player-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.25);
+}
