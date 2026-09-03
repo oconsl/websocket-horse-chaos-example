@@ -15,6 +15,7 @@ model Player {
   passwordHash String
   sessionToken String   @unique
   coins        Int      @default(1000)
+  isAdmin      Boolean  @default(false)
   createdAt    DateTime @default(now())
   bets         Bet[]
   powerUps     PlayerPowerUp[]

@@ -1,11 +1,10 @@
-import { Controller, Param, Post } from '@nestjs/common';
+import { Controller, Param, Post, UseGuards } from '@nestjs/common';
 import { GameService } from './game.service.js';
+import { AdminGuard } from '../auth/admin.guard.js';
 
-/**
- * No auth on admin routes this phase — classroom demo, not gated behind
- * player sessions. Drives the game state machine from a host/instructor page.
- */
+/** Drives the game state machine from a host/instructor page. Admin-only. */
 @Controller('admin/races')
+@UseGuards(AdminGuard)
 export class AdminRacesController {
   constructor(private readonly gameService: GameService) {}
 
