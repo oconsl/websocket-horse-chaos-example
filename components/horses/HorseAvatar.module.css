@@ -1,44 +1,160 @@
+/* Toy rocking-horse, recolored per lane. Natural layout is a fixed pixel
+   design (see .swing and children below); `.crop` scales+shifts it down to
+   fit the `.avatar` box, measured from the natural render:
+   bbox ~356x268px, top-left offset ~(-7, -206) relative to `.swing`. */
 .avatar {
+  display: inline-block;
+  position: relative;
   width: 1.75rem;
   height: 1.75rem;
+  overflow: hidden;
   flex-shrink: 0;
-  overflow: visible;
+  vertical-align: middle;
+  /* The toy horse's nose/head sits at the natural design's left edge (tail
+     at the right) — mirror so it faces right, the direction the race runs
+     (left -> right, finish line on the right). */
+  transform: scaleX(-1);
 }
 
-.running {
-  animation: gallop 0.4s ease-in-out infinite;
+.crop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: scale(0.0788) translate(7px, 206px);
+  transform-origin: 0 0;
 }
 
-@keyframes gallop {
-  0%,
-  100% {
-    transform: translateY(0);
+.running .swing {
+  animation-duration: 0.45s;
+}
+
+.swing {
+  border-radius: 0 113px 189px 207px / 0 0 150px 150px;
+  height: 40px;
+  width: 300px;
+  background-color: #3f220f;
+  animation: swinging 2s ease-in-out infinite;
+}
+
+.leftLeg,
+.rightLeg {
+  height: 50px;
+  width: 30px;
+  background-color: var(--h-base);
+  position: relative;
+  left: 50px;
+}
+
+.leftLeg {
+  bottom: 50px;
+}
+
+.rightLeg {
+  bottom: 100px;
+  left: 210px;
+}
+
+.body {
+  height: 90px;
+  width: 250px;
+  background: radial-gradient(circle at 56% 0%, var(--h-spot) 23%, var(--h-dark) 25%, var(--h-base) 24%);
+  border-radius: 93px 159px 152px 157px / 68px 80px 72px 99px;
+  position: relative;
+  bottom: 220px;
+  left: 20px;
+}
+
+.head {
+  height: 80px;
+  width: 60px;
+  background: radial-gradient(circle at 60% 36%, #000 10%, var(--h-base) 11%);
+  border-radius: 5px;
+  position: relative;
+  bottom: 370px;
+  left: 10px;
+  z-index: -1;
+  transform: rotate(-20deg);
+}
+
+.nose {
+  height: 40px;
+  width: 50px;
+  background: radial-gradient(circle at 0% 50%, var(--h-light) 38%, var(--h-base) 38%);
+  border-radius: 157px 176px 154px 80px / 109px 21px 33px 49px;
+  position: relative;
+  bottom: 436px;
+  left: -30px;
+  transform: rotate(-20deg);
+}
+
+.mane {
+  height: 90px;
+  width: 40px;
+  background-color: var(--h-dark);
+  border-radius: 48% 52% 0% 100% / 58% 26% 74% 42%;
+  position: relative;
+  bottom: 504px;
+  left: 60px;
+  transform: rotate(-200deg);
+}
+
+.tail {
+  height: 50px;
+  width: 80px;
+  background-color: var(--h-dark);
+  position: relative;
+  bottom: 500px;
+  left: 250px;
+  transform: rotate(-170deg);
+  border-radius: 0% 100% 50% 50% / 50% 50% 50% 50%;
+}
+
+@keyframes swinging {
+  0% {
+    transform: rotate(10deg);
   }
   50% {
-    transform: translateY(-2px);
+    transform: rotate(-5deg);
+  }
+  100% {
+    transform: rotate(10deg);
   }
 }
 
-.tank {
-  filter: drop-shadow(0 0 0 currentColor);
+/* Lane palettes — order matches the api's alphabetical seed (game.service.ts
+   createRace): 1 CSS Master, 2 El Backend, 3 NullPointer, 4 Segmentation
+   Fault, 5 localhost:3000. Same hues as --accent-horse-N in globals.css. */
+.lane1 {
+  --h-base: #2f9e44;
+  --h-dark: #1b5e2a;
+  --h-light: #7fd99a;
+  --h-spot: #58c774;
 }
 
-.glitchLayer {
-  mix-blend-mode: screen;
+.lane2 {
+  --h-base: #d4380d;
+  --h-dark: #7a2008;
+  --h-light: #ff8a63;
+  --h-spot: #ff5a3c;
 }
 
-.crack {
-  stroke: var(--bg);
+.lane3 {
+  --h-base: #1c5fd4;
+  --h-dark: #0f3a86;
+  --h-light: #6fa3ff;
+  --h-spot: #4d8dff;
 }
 
-.ghost {
-  opacity: 0.7;
+.lane4 {
+  --h-base: #e0a800;
+  --h-dark: #8a6600;
+  --h-light: #ffd966;
+  --h-spot: #ffcc33;
 }
 
-.scanlines {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 0.5;
-  stroke-dasharray: 1 3;
-  opacity: 0.4;
+.lane5 {
+  --h-base: #7c3fd4;
+  --h-dark: #4a2280;
+  --h-light: #b98fff;
+  --h-spot: #a366ff;
 }

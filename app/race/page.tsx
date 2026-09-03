@@ -512,104 +512,175 @@ export default function RacePage() {
 
       {isTrackPhase && (
         <div className="track-wrap">
-          <div className={`race-track-bg${race.status === 'RACING' ? ' race-track-bg--racing' : ''}`}>
-            <div className="track">
-              {race.odds.horses
-                .slice()
-                .sort((a, b) => a.lane - b.lane)
-                .map((horse) => {
-                  const snap = horsePositions.find((h) => h.lane === horse.lane);
-                  const pct = snap ? Math.min(100, (snap.position / TRACK_LENGTH) * 100) : 0;
-                  const isMine = confirmedBet?.horseId === horse.horseId;
+          <div className="race-main">
+            <div className={`race-track-bg${race.status === 'RACING' ? ' race-track-bg--racing' : ''}`}>
+              <div className="track">
+                {race.odds.horses
+                  .slice()
+                  .sort((a, b) => a.lane - b.lane)
+                  .map((horse) => {
+                    const snap = horsePositions.find((h) => h.lane === horse.lane);
+                    const pct = snap ? Math.min(100, (snap.position / TRACK_LENGTH) * 100) : 0;
+                    const isMine = confirmedBet?.horseId === horse.horseId;
 
-                  return (
-                    <div
-                      key={horse.lane}
-                      className={`track-lane${hitLane === horse.lane ? ' track-lane--hit' : ''}`}
-                    >
-                      <span className="track-lane-label">
-                        #{horse.lane} {horse.name}
-                        {isMine ? ' 🎯' : ''}
-                      </span>
-                      <div className="track-lane-rail">
-                        <span
-                          className={`track-horse${finishedLanes.has(horse.lane) ? ' track-horse--finished' : ''}`}
-                          style={{ left: `${pct}%` }}
-                        >
-                          <HorseAvatar lane={horse.lane} running={race.status === 'RACING'} />
+                    return (
+                      <div
+                        key={horse.lane}
+                        className={`track-lane${hitLane === horse.lane ? ' track-lane--hit' : ''}`}
+                      >
+                        <span className="track-lane-label">
+                          #{horse.lane} {horse.name}
+                          {isMine ? ' 🎯' : ''}
                         </span>
+                        <div className="track-lane-rail">
+                          <span
+                            className={`track-horse${finishedLanes.has(horse.lane) ? ' track-horse--finished' : ''}`}
+                            style={{ left: `${pct}%` }}
+                          >
+                            <HorseAvatar lane={horse.lane} running={race.status === 'RACING'} />
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+              </div>
             </div>
+
+            {race.status === 'RACING' && powerUps.length > 0 && (
+              <Card className="powerups-panel">
+                <h2>Tus poderes</h2>
+                {powerUpError && <p className="error">{powerUpError}</p>}
+                <ul className="powerups-list">
+                  {powerUps.map((powerUp) => {
+                    const info = POWER_UP_INFO[powerUp.type];
+                    const isUsed = usedPowerUpIds.has(powerUp.id);
+                    const isSelected = selectedPowerUpId === powerUp.id;
+
+                    return (
+                      <li key={powerUp.id} className="powerup-card">
+                        <Button
+                          variant="ghost"
+                          className={`powerup-card-button${isSelected ? ' powerup-card-button--selected' : ''}`}
+                          disabled={isUsed}
+                          onClick={() => {
+                            setPowerUpError(null);
+                            setSelectedPowerUpId((prev) => (prev === powerUp.id ? null : powerUp.id));
+                            setSelectedLane(null);
+                          }}
+                        >
+                          <span className="powerup-emoji">{info.emoji}</span>
+                          <span>{info.label}</span>
+                          {isUsed && <span className="powerup-used-tag">usado</span>}
+                        </Button>
+
+                        {isSelected && !isUsed && (
+                          <div className="powerup-lane-picker">
+                            {[1, 2, 3, 4, 5].map((lane) => (
+                              <Button
+                                variant="ghost"
+                                key={lane}
+                                className={`lane-pick${selectedLane === lane ? ' lane-pick--selected' : ''}`}
+                                onClick={() => setSelectedLane(lane)}
+                              >
+                                #{lane}
+                              </Button>
+                            ))}
+                            <Button
+                              className="powerup-submit"
+                              disabled={!selectedLane}
+                              onClick={() => usePowerUp(powerUp.id)}
+                            >
+                              USAR
+                            </Button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            )}
           </div>
 
-          {race.status === 'RACING' && powerUps.length > 0 && (
-            <Card className="powerups-panel">
-              <h2>Tus poderes</h2>
-              {powerUpError && <p className="error">{powerUpError}</p>}
-              <ul className="powerups-list">
-                {powerUps.map((powerUp) => {
-                  const info = POWER_UP_INFO[powerUp.type];
-                  const isUsed = usedPowerUpIds.has(powerUp.id);
-                  const isSelected = selectedPowerUpId === powerUp.id;
+          <div className="race-side">
+            {race.status !== 'RESULTS' && events.length > 0 && (
+              <div className="event-feed">
+                <h2>Eventos</h2>
+                <ul>
+                  {events.slice(0, 4).map((event, i) => (
+                    <li key={events.length - i}>{describeEvent(event, horseNameByLane)}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
+            {race.status === 'RESULTS' && standings && (
+              <Card className="results-panel">
+                <Confetti />
+                <h2>Resultados</h2>
+
+                {(() => {
+                  const sorted = standings.slice().sort((a, b) => a.place - b.place);
+                  const medals = ['🥇', '🥈', '🥉'];
                   return (
-                    <li key={powerUp.id} className="powerup-card">
-                      <Button
-                        variant="ghost"
-                        className={`powerup-card-button${isSelected ? ' powerup-card-button--selected' : ''}`}
-                        disabled={isUsed}
-                        onClick={() => {
-                          setPowerUpError(null);
-                          setSelectedPowerUpId((prev) => (prev === powerUp.id ? null : powerUp.id));
-                          setSelectedLane(null);
-                        }}
-                      >
-                        <span className="powerup-emoji">{info.emoji}</span>
-                        <span>{info.label}</span>
-                        {isUsed && <span className="powerup-used-tag">usado</span>}
-                      </Button>
-
-                      {isSelected && !isUsed && (
-                        <div className="powerup-lane-picker">
-                          {[1, 2, 3, 4, 5].map((lane) => (
-                            <Button
-                              variant="ghost"
-                              key={lane}
-                              className={`lane-pick${selectedLane === lane ? ' lane-pick--selected' : ''}`}
-                              onClick={() => setSelectedLane(lane)}
-                            >
-                              #{lane}
-                            </Button>
-                          ))}
-                          <Button
-                            className="powerup-submit"
-                            disabled={!selectedLane}
-                            onClick={() => usePowerUp(powerUp.id)}
-                          >
-                            USAR
-                          </Button>
-                        </div>
-                      )}
-                    </li>
+                    <ol className="podium">
+                      {sorted.slice(0, 3).map((finish, i) => (
+                        <li key={finish.lane} className={`podium-place podium-place--${i + 1}`}>
+                          <span className="podium-medal">{medals[i]}</span>
+                          <HorseAvatar lane={finish.lane} />
+                          <span className="podium-name">
+                            {horseNameByLane.get(finish.lane) ?? finish.horseId}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
                   );
-                })}
-              </ul>
-            </Card>
-          )}
+                })()}
 
-          {events.length > 0 && (
-            <div className="event-feed">
-              <h2>Eventos</h2>
-              <ul>
-                {events.slice(0, 4).map((event, i) => (
-                  <li key={events.length - i}>{describeEvent(event, horseNameByLane)}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+                <ol className="standings-list">
+                  {standings
+                    .slice()
+                    .sort((a, b) => a.place - b.place)
+                    .map((finish) => (
+                      <li key={finish.lane} className="standings-row">
+                        <span className="standings-place">{finish.place}°</span>
+                        <span>
+                          #{finish.lane} {horseNameByLane.get(finish.lane) ?? finish.horseId}
+                        </span>
+                      </li>
+                    ))}
+                </ol>
+
+                {confirmedBet && !results && (
+                  <p className="race-status">Calculando tu pago...</p>
+                )}
+
+                {results?.myBet && (
+                  <div
+                    className={`payout-banner payout-banner--result${
+                      results.myBet.payout && results.myBet.payout > 0
+                        ? ' payout-banner--win'
+                        : ' payout-banner--loss'
+                    }`}
+                  >
+                    {results.myBet.payout && results.myBet.payout > 0 ? (
+                      <p>GANASTE 🎉 +{results.myBet.payout} coins</p>
+                    ) : (
+                      <p>PERDISTE 😢 (apostaste {results.myBet.amount} coins)</p>
+                    )}
+                  </div>
+                )}
+
+                {payout?.reason === 'bailout' && (
+                  <div className="payout-banner payout-banner--bailout">
+                    <p>🏛️ Subsidio de coins del banco central. ¡Que la próxima corras mejor suerte!</p>
+                  </div>
+                )}
+
+                {payout && <Badge>Coins actuales: {payout.coins}</Badge>}
+              </Card>
+            )}
+          </div>
         </div>
       )}
 
@@ -619,73 +690,6 @@ export default function RacePage() {
             {countdown}
           </span>
         </div>
-      )}
-
-      {race && race.status === 'RESULTS' && standings && (
-        <Card className="results-panel">
-          <Confetti />
-          <h2>Resultados</h2>
-
-          {(() => {
-            const sorted = standings.slice().sort((a, b) => a.place - b.place);
-            const medals = ['🥇', '🥈', '🥉'];
-            return (
-              <ol className="podium">
-                {sorted.slice(0, 3).map((finish, i) => (
-                  <li key={finish.lane} className={`podium-place podium-place--${i + 1}`}>
-                    <span className="podium-medal">{medals[i]}</span>
-                    <HorseAvatar lane={finish.lane} />
-                    <span className="podium-name">
-                      {horseNameByLane.get(finish.lane) ?? finish.horseId}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            );
-          })()}
-
-          <ol className="standings-list">
-            {standings
-              .slice()
-              .sort((a, b) => a.place - b.place)
-              .map((finish) => (
-                <li key={finish.lane} className="standings-row">
-                  <span className="standings-place">{finish.place}°</span>
-                  <span>
-                    #{finish.lane} {horseNameByLane.get(finish.lane) ?? finish.horseId}
-                  </span>
-                </li>
-              ))}
-          </ol>
-
-          {confirmedBet && !results && (
-            <p className="race-status">Calculando tu pago...</p>
-          )}
-
-          {results?.myBet && (
-            <div
-              className={`payout-banner payout-banner--result${
-                results.myBet.payout && results.myBet.payout > 0
-                  ? ' payout-banner--win'
-                  : ' payout-banner--loss'
-              }`}
-            >
-              {results.myBet.payout && results.myBet.payout > 0 ? (
-                <p>GANASTE 🎉 +{results.myBet.payout} coins</p>
-              ) : (
-                <p>PERDISTE 😢 (apostaste {results.myBet.amount} coins)</p>
-              )}
-            </div>
-          )}
-
-          {payout?.reason === 'bailout' && (
-            <div className="payout-banner payout-banner--bailout">
-              <p>🏛️ Subsidio de coins del banco central. ¡Que la próxima corras mejor suerte!</p>
-            </div>
-          )}
-
-          {payout && <Badge>Coins actuales: {payout.coins}</Badge>}
-        </Card>
       )}
     </main>
   );
