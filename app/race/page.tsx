@@ -34,6 +34,38 @@ interface ConfirmedBet {
   amount: number;
 }
 
+interface RaceHorseSnapshot {
+  lane: number;
+  position: number;
+  speed: number;
+}
+
+interface RaceEventPayload {
+  raceId: string;
+  type: string;
+  [key: string]: unknown;
+}
+
+interface HorseFinish {
+  lane: number;
+  horseId: string;
+  place: number;
+}
+
+interface CoinsUpdatedPayload {
+  coins: number;
+  reason: 'race_payout' | 'bailout';
+}
+
+interface RaceResults {
+  raceId: string;
+  status: RaceStatus;
+  standings: { lane: number; horseId: string; name: string; place: number }[];
+  myBet: { horseId: string; amount: number; payout: number | null } | null;
+}
+
+/** Matches api/src/game/race-engine.service.ts TRACK_LENGTH. */
+const TRACK_LENGTH = 1000;
 const BET_STEP = 50;
 
 export default function RacePage() {
@@ -49,6 +81,14 @@ export default function RacePage() {
   const [confirmedBet, setConfirmedBet] = useState<ConfirmedBet | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [horsePositions, setHorsePositions] = useState<RaceHorseSnapshot[]>([]);
+  const [events, setEvents] = useState<RaceEventPayload[]>([]);
+  const [standings, setStandings] = useState<HorseFinish[] | null>(null);
+  const [payout, setPayout] = useState<CoinsUpdatedPayload | null>(null);
+  const [results, setResults] = useState<RaceResults | null>(null);
+
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
@@ -81,7 +121,7 @@ export default function RacePage() {
     };
   }, []);
 
-  // Live odds/status via socket.
+  // Live odds/status/race via socket.
   useEffect(() => {
     if (!session?.sessionToken) return;
 
@@ -92,6 +132,12 @@ export default function RacePage() {
       setRace({ id: payload.raceId, status: 'BETTING', odds: payload.odds });
       setConfirmedBet(null);
       setSelectedHorseId(null);
+      setCountdown(null);
+      setHorsePositions([]);
+      setEvents([]);
+      setStandings(null);
+      setPayout(null);
+      setResults(null);
     });
 
     socket.on('betting:closed', (payload: { raceId: string }) => {
@@ -104,16 +150,61 @@ export default function RacePage() {
       setRace((prev) => (prev && prev.id === payload.raceId ? { ...prev, odds: payload.odds } : prev));
     });
 
+    socket.on('race:countdown', (payload: { raceId: string; count: number }) => {
+      setRace((prev) => (prev ? { ...prev, status: 'COUNTDOWN' } : prev));
+      setCountdown(payload.count);
+    });
+
+    socket.on('race:started', () => {
+      setRace((prev) => (prev ? { ...prev, status: 'RACING' } : prev));
+      setCountdown(null);
+    });
+
+    socket.on('race:update', (payload: { raceId: string; horses: RaceHorseSnapshot[] }) => {
+      setHorsePositions(payload.horses);
+    });
+
+    socket.on('race:event', (payload: RaceEventPayload) => {
+      setEvents((prev) => [payload, ...prev].slice(0, 30));
+    });
+
+    socket.on('race:finished', (payload: { raceId: string; standings: HorseFinish[] }) => {
+      setRace((prev) => (prev ? { ...prev, status: 'RESULTS' } : prev));
+      setStandings(payload.standings);
+
+      // Public standings arrive first; fetch our own bet/payout right after
+      // (server settles bets before broadcasting race:finished).
+      fetch(`${API_URL}/races/${payload.raceId}/results`, {
+        headers: session?.sessionToken ? { 'x-session-token': session.sessionToken } : {},
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) setResults(data);
+        })
+        .catch(() => {});
+    });
+
+    socket.on('coins:updated', (payload: CoinsUpdatedPayload) => {
+      setCoins(payload.coins);
+      setPayout(payload);
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [session?.sessionToken]);
+  }, [session?.sessionToken, setCoins]);
 
   const maxBet = useMemo(() => {
     const coins = session?.coins ?? 0;
     return Math.max(BET_STEP, Math.floor(coins / BET_STEP) * BET_STEP);
   }, [session?.coins]);
+
+  const horseNameByLane = useMemo(() => {
+    const map = new Map<number, string>();
+    race?.odds.horses.forEach((h) => map.set(h.lane, h.name));
+    return map;
+  }, [race]);
 
   function adjustBet(delta: number) {
     setBetAmount((current) => {
@@ -164,6 +255,9 @@ export default function RacePage() {
       </main>
     );
   }
+
+  const isTrackPhase =
+    race && (race.status === 'COUNTDOWN' || race.status === 'RACING' || race.status === 'RESULTS');
 
   return (
     <main className="race-page">
@@ -255,6 +349,111 @@ export default function RacePage() {
           )}
         </>
       )}
+
+      {isTrackPhase && (
+        <div className="track-wrap">
+          <div className="track">
+            {race.odds.horses
+              .slice()
+              .sort((a, b) => a.lane - b.lane)
+              .map((horse) => {
+                const snap = horsePositions.find((h) => h.lane === horse.lane);
+                const pct = snap ? Math.min(100, (snap.position / TRACK_LENGTH) * 100) : 0;
+                const isMine = confirmedBet?.horseId === horse.horseId;
+
+                return (
+                  <div key={horse.lane} className="track-lane">
+                    <span className="track-lane-label">
+                      #{horse.lane} {horse.name}
+                      {isMine ? ' 🎯' : ''}
+                    </span>
+                    <div className="track-lane-rail">
+                      <span className="track-horse" style={{ left: `${pct}%` }}>
+                        🐎
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+
+          {events.length > 0 && (
+            <div className="event-feed">
+              <h2>Eventos</h2>
+              <ul>
+                {events.map((event, i) => (
+                  <li key={i}>{describeEvent(event, horseNameByLane)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {race && race.status === 'COUNTDOWN' && countdown !== null && (
+        <div className="countdown-overlay">
+          <span className="countdown-number">{countdown}</span>
+        </div>
+      )}
+
+      {race && race.status === 'RESULTS' && standings && (
+        <div className="results-panel">
+          <h2>Resultados</h2>
+          <ol className="standings-list">
+            {standings
+              .slice()
+              .sort((a, b) => a.place - b.place)
+              .map((finish) => (
+                <li key={finish.lane} className="standings-row">
+                  <span className="standings-place">{finish.place}°</span>
+                  <span>
+                    #{finish.lane} {horseNameByLane.get(finish.lane) ?? finish.horseId}
+                  </span>
+                </li>
+              ))}
+          </ol>
+
+          {confirmedBet && !results && (
+            <p className="race-status">Calculando tu pago...</p>
+          )}
+
+          {results?.myBet && (
+            <div
+              className={`payout-banner${
+                results.myBet.payout && results.myBet.payout > 0
+                  ? ' payout-banner--win'
+                  : ' payout-banner--loss'
+              }`}
+            >
+              {results.myBet.payout && results.myBet.payout > 0 ? (
+                <p>GANASTE 🎉 +{results.myBet.payout} coins</p>
+              ) : (
+                <p>perdiste 😢 (apostaste {results.myBet.amount} coins)</p>
+              )}
+            </div>
+          )}
+
+          {payout?.reason === 'bailout' && (
+            <div className="payout-banner payout-banner--bailout">
+              <p>🏛️ Subsidio de coins del banco central. ¡Que la próxima corras mejor suerte!</p>
+            </div>
+          )}
+
+          {payout && (
+            <p className="badge-coins">Coins actuales: {payout.coins}</p>
+          )}
+        </div>
+      )}
     </main>
   );
+}
+
+function describeEvent(event: RaceEventPayload, horseNameByLane: Map<number, string>): string {
+  if (event.type === 'horse.finished') {
+    const lane = event.lane as number;
+    const place = event.place as number;
+    const name = horseNameByLane.get(lane) ?? `Caballo #${lane}`;
+    return `🏁 ${name} llegó en el puesto ${place}°`;
+  }
+  return `${event.type}: ${JSON.stringify(event)}`;
 }

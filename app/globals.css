@@ -305,3 +305,142 @@ a {
   font-weight: 700;
   color: #2f9e44;
 }
+
+/* ---- Track / countdown / results (phase 3) ---- */
+
+.track-wrap {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.track {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.track-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.track-lane-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.track-lane-rail {
+  position: relative;
+  height: 2rem;
+  border-radius: 8px;
+  background: rgba(128, 128, 128, 0.12);
+  border: 1px solid rgba(128, 128, 128, 0.25);
+  overflow: hidden;
+}
+
+.track-horse {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.3rem;
+  transition: left 100ms linear;
+}
+
+.event-feed h2 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.event-feed ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.event-feed li {
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(128, 128, 128, 0.08);
+}
+
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 10;
+}
+
+.countdown-number {
+  font-size: 8rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.results-panel {
+  margin-top: 1.5rem;
+}
+
+.results-panel h2 {
+  margin-bottom: 0.75rem;
+}
+
+.standings-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-left: 0;
+  margin-bottom: 1.25rem;
+}
+
+.standings-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.25);
+}
+
+.standings-place {
+  font-weight: 900;
+  min-width: 2rem;
+}
+
+.payout-banner {
+  margin-top: 1rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 10px;
+  font-weight: 700;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+}
+
+.payout-banner--win {
+  color: #2f9e44;
+  border-color: #2f9e44;
+  background: rgba(47, 158, 68, 0.08);
+}
+
+.payout-banner--loss {
+  color: #e5484d;
+  border-color: #e5484d;
+  background: rgba(229, 72, 77, 0.08);
+}
+
+.payout-banner--bailout {
+  color: #d4380d;
+  border-color: #d4380d;
+  background: rgba(212, 56, 13, 0.08);
+}

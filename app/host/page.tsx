@@ -52,6 +52,12 @@ export default function HostPage() {
     if (data?.status) setStatus(data.status);
   }
 
+  async function startRace() {
+    if (!raceId) return;
+    const data = await call(`/admin/races/${raceId}/start`);
+    if (data?.status) setStatus(data.status);
+  }
+
   return (
     <main style={{ padding: '2rem', fontFamily: 'monospace' }}>
       <h1>Host panel (demo)</h1>
@@ -67,6 +73,9 @@ export default function HostPage() {
         </button>
         <button type="button" onClick={closeBetting} disabled={!raceId}>
           3. Cerrar apuestas
+        </button>
+        <button type="button" onClick={startRace} disabled={!raceId}>
+          4. Iniciar carrera
         </button>
       </div>
 
