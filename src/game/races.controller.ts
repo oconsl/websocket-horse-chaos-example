@@ -35,4 +35,14 @@ export class RacesController {
   ) {
     return this.gameService.placeBet(id, player, dto);
   }
+
+  /**
+   * Standings are public; the caller's own bet/payout come along for free
+   * since PlayerAuthGuard resolves who's asking.
+   */
+  @Get(':id/results')
+  @UseGuards(PlayerAuthGuard)
+  getResults(@Param('id') id: string, @CurrentPlayer() player: Player) {
+    return this.gameService.getRaceResults(id, player);
+  }
 }

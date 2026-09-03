@@ -23,4 +23,9 @@ export class AdminRacesController {
   closeBetting(@Param('id') id: string) {
     return this.gameService.closeBetting(id);
   }
+
+  @Post(':id/start')
+  start(@Param('id') id: string) {
+    return this.gameService.startRace(id);
+  }
 }

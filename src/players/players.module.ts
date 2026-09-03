@@ -4,5 +4,6 @@ import { PlayersService } from './players.service.js';
 
 @Module({
   providers: [PlayersGateway, PlayersService],
+  exports: [PlayersService],
 })
 export class PlayersModule {}

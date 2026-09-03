@@ -34,4 +34,15 @@ export class PlayersService {
       count: players.length,
     };
   }
+
+  /** All socket ids currently registered for a player (multiple tabs/devices possible). */
+  getSocketIdsForPlayer(playerId: string): string[] {
+    const socketIds: string[] = [];
+    for (const [socketId, player] of this.connections) {
+      if (player.playerId === playerId) {
+        socketIds.push(socketId);
+      }
+    }
+    return socketIds;
+  }
 }

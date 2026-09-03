@@ -34,6 +34,12 @@ model Race {
   createdAt  DateTime    @default(now())
   startedAt  DateTime?
   finishedAt DateTime?
+  /**
+   * Odds snapshot taken the moment betting closes (see odds.ts OddsSnapshot),
+   * persisted so payouts settle against the price bettors actually saw —
+   * never against odds that drift while the race is running.
+   */
+  finalOdds  Json?
   horses     RaceHorse[]
   bets       Bet[]
 }
@@ -69,6 +75,8 @@ model Bet {
   race      Race     @relation(fields: [raceId], references: [id])
   horseId   String
   amount    Int
+  /** Coins credited for this bet at settlement — null until the race finishes, 0 for a loss. */
+  payout    Int?
   createdAt DateTime @default(now())
 
   @@unique([playerId, raceId])
