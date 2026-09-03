@@ -678,6 +678,10 @@ export default function RacePage() {
                 )}
 
                 {payout && <Badge>Coins actuales: {payout.coins}</Badge>}
+
+                <Button className="back-to-lobby" onClick={() => router.push('/lobby')}>
+                  ← Volver al lobby
+                </Button>
               </Card>
             )}
           </div>

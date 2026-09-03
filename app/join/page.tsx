@@ -7,11 +7,15 @@ import { useSessionStore } from '@/store/session';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 
+type Mode = 'login' | 'register';
+
 export default function JoinPage() {
   const router = useRouter();
   const setSession = useSessionStore((state) => state.setSession);
 
+  const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -21,14 +25,16 @@ export default function JoinPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_URL}/sessions`, {
+      const res = await fetch(`${API_URL}/sessions/${mode}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ username, password }),
       });
 
       if (!res.ok) {
-        setError('Username inválido');
+        setError(
+          mode === 'login' ? 'Usuario o contraseña inválidos' : 'No se pudo crear la cuenta',
+        );
         setLoading(false);
         return;
       }
@@ -51,7 +57,32 @@ export default function JoinPage() {
     <main className="join-page">
       <Card className="join-card">
         <h1>Horse Chaos</h1>
-        <p className="subtitle">Ingresá tu nombre para entrar al lobby</p>
+        <p className="subtitle">
+          {mode === 'login' ? 'Iniciá sesión para entrar al lobby' : 'Creá tu cuenta para entrar al lobby'}
+        </p>
+
+        <div className="join-tabs">
+          <button
+            type="button"
+            className={`join-tab${mode === 'login' ? ' join-tab--active' : ''}`}
+            onClick={() => {
+              setMode('login');
+              setError(null);
+            }}
+          >
+            Iniciar sesión
+          </button>
+          <button
+            type="button"
+            className={`join-tab${mode === 'register' ? ' join-tab--active' : ''}`}
+            onClick={() => {
+              setMode('register');
+              setError(null);
+            }}
+          >
+            Registrarse
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <input
@@ -63,8 +94,21 @@ export default function JoinPage() {
             required
             autoFocus
           />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Contraseña"
+            minLength={6}
+            maxLength={72}
+            required
+          />
           <Button type="submit" disabled={loading}>
-            {loading ? 'ENTRANDO...' : 'ENTRAR'}
+            {loading
+              ? 'ENTRANDO...'
+              : mode === 'login'
+                ? 'INICIAR SESIÓN'
+                : 'CREAR CUENTA'}
           </Button>
         </form>
 

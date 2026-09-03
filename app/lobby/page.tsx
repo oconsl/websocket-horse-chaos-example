@@ -7,6 +7,7 @@ import { getGameSocket } from '@/lib/socket';
 import { useSessionStore } from '@/store/session';
 import { useHydrateSession } from '@/lib/useHydrateSession';
 import { Badge } from '@/components/ui/Badge';
+import { TabloidNews } from '@/components/news/TabloidNews';
 
 interface LobbyPlayer {
   playerId: string;
@@ -77,6 +78,8 @@ export default function LobbyPage() {
       </div>
 
       <h1>Lobby</h1>
+
+      <TabloidNews />
 
       {socketError && <p className="error">{socketError}</p>}
 
