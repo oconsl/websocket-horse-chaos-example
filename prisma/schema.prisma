@@ -16,6 +16,7 @@ model Player {
   coins        Int      @default(1000)
   createdAt    DateTime @default(now())
   bets         Bet[]
+  powerUps     PlayerPowerUp[]
 }
 
 enum RaceStatus {
@@ -25,6 +26,13 @@ enum RaceStatus {
   COUNTDOWN
   RACING
   RESULTS
+}
+
+enum PowerUpType {
+  TURBO
+  SLOW
+  BOMB
+  SHIELD
 }
 
 model Race {
@@ -42,6 +50,7 @@ model Race {
   finalOdds  Json?
   horses     RaceHorse[]
   bets       Bet[]
+  powerUps   PlayerPowerUp[]
 }
 
 model Horse {
@@ -65,6 +74,19 @@ model RaceHorse {
 
   @@unique([raceId, lane])
   @@unique([raceId, horseId])
+}
+
+model PlayerPowerUp {
+  id         String      @id @default(uuid())
+  playerId   String
+  player     Player      @relation(fields: [playerId], references: [id])
+  raceId     String
+  race       Race        @relation(fields: [raceId], references: [id])
+  type       PowerUpType
+  used       Boolean     @default(false)
+  targetLane Int?
+  usedAt     DateTime?
+  createdAt  DateTime    @default(now())
 }
 
 model Bet {

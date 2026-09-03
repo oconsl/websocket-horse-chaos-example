@@ -34,7 +34,100 @@ export interface HorseFinish {
 interface HorseRunState extends RaceHorseInput {
   position: number;
   velocity: number;
+  /** Velocity actually applied last tick (base velocity with power-up multipliers/fatigue folded in) — what we broadcast. */
+  effectiveVelocity: number;
   finished: boolean;
+}
+
+export type PowerUpEffectType = 'TURBO' | 'SLOW' | 'BOMB' | 'SHIELD';
+
+interface ActiveEffect {
+  type: PowerUpEffectType;
+  expiresAt: number;
+}
+
+/** +30% speed for 3s. */
+const TURBO_MULTIPLIER = 1.3;
+const TURBO_DURATION_MS = 3000;
+/** -25% speed for 3s. */
+const SLOW_MULTIPLIER = 0.75;
+const SLOW_DURATION_MS = 3000;
+/** Brief stun (speed=0) plus a flat position knockback. */
+const BOMB_STUN_MS = 1000;
+const BOMB_KNOCKBACK = 25;
+/** Blocks TURBO/SLOW/BOMB while active. */
+const SHIELD_DURATION_MS = 4000;
+
+/**
+ * Live per-race handle the gateway hands out to `GameService` so a
+ * `powerup:use` event landing mid-simulation can mutate the running race
+ * (rather than the finished promise this method already returns). One
+ * instance per in-flight race; discarded once `runRace` resolves.
+ */
+export class RaceEngineHandle {
+  /** lane -> effects currently in flight for that horse, each tagged with an absolute expiry timestamp. */
+  private readonly effectsByLane = new Map<number, ActiveEffect[]>();
+
+  constructor(private readonly state: HorseRunState[]) {}
+
+  hasLane(lane: number): boolean {
+    return this.state.some((h) => h.lane === lane);
+  }
+
+  isFinished(lane: number): boolean {
+    return this.state.find((h) => h.lane === lane)?.finished ?? true;
+  }
+
+  isShielded(lane: number, now: number): boolean {
+    const effects = this.effectsByLane.get(lane);
+    if (!effects) return false;
+    return effects.some((e) => e.type === 'SHIELD' && e.expiresAt > now);
+  }
+
+  /**
+   * Applies a power-up to a lane. Returns `'blocked'` when an active SHIELD
+   * absorbed a TURBO/SLOW/BOMB (SHIELD itself is never blocked). Returns
+   * `'applied'` otherwise, mutating the running simulation state directly —
+   * timed effects (TURBO/SLOW/SHIELD) are picked up by the next tick, and
+   * BOMB's knockback is instantaneous.
+   */
+  applyEffect(lane: number, type: PowerUpEffectType, now: number): 'applied' | 'blocked' {
+    if (type !== 'SHIELD' && this.isShielded(lane, now)) {
+      return 'blocked';
+    }
+
+    const effects = this.effectsByLane.get(lane) ?? [];
+    const expiresAt =
+      type === 'TURBO'
+        ? now + TURBO_DURATION_MS
+        : type === 'SLOW'
+          ? now + SLOW_DURATION_MS
+          : type === 'BOMB'
+            ? now + BOMB_STUN_MS
+            : now + SHIELD_DURATION_MS;
+
+    effects.push({ type, expiresAt });
+    this.effectsByLane.set(lane, effects);
+
+    if (type === 'BOMB') {
+      const horse = this.state.find((h) => h.lane === lane);
+      if (horse) {
+        horse.position = Math.max(0, horse.position - BOMB_KNOCKBACK);
+        horse.velocity = 0;
+      }
+    }
+
+    return 'applied';
+  }
+
+  /** Prunes expired effects and returns the still-active ones for a lane at `now`. */
+  activeEffects(lane: number, now: number): ActiveEffect[] {
+    const effects = this.effectsByLane.get(lane);
+    if (!effects) return [];
+    const live = effects.filter((e) => e.expiresAt > now);
+    this.effectsByLane.set(lane, live);
+    return live;
+  }
 }
 
 /** Deterministic string seed -> 32-bit int seed for mulberry32. */
@@ -73,14 +166,29 @@ export class RaceEngineService {
 
   constructor(private readonly gameGateway: GameGateway) {}
 
-  async runRace(raceId: string, seed: string, horses: RaceHorseInput[]): Promise<HorseFinish[]> {
+  /**
+   * @param onHandleReady Invoked synchronously with a `RaceEngineHandle` for
+   * this run before the simulation loop starts, so the caller (GameService)
+   * can stash it and apply power-ups mid-race via `powerup:use`. The handle
+   * is only valid for the lifetime of this call.
+   */
+  async runRace(
+    raceId: string,
+    seed: string,
+    horses: RaceHorseInput[],
+    onHandleReady?: (handle: RaceEngineHandle) => void,
+  ): Promise<HorseFinish[]> {
     const rng = mulberry32(hashSeed(seed));
     const state: HorseRunState[] = horses.map((h) => ({
       ...h,
       position: 0,
       velocity: 0,
+      effectiveVelocity: 0,
       finished: false,
     }));
+
+    const handle = new RaceEngineHandle(state);
+    onHandleReady?.(handle);
 
     const finishes: HorseFinish[] = [];
     let tick = 0;
@@ -103,8 +211,22 @@ export class RaceEngineService {
 
         // Late-race fatigue: low-stamina horses lose a bit of pace near the end.
         const fatigue = Math.max(0, progress - 0.6) * (1 - horse.stamina / 100) * 1.5;
-        const effectiveVelocity = Math.max(horse.velocity * (1 - fatigue), 0.2);
+        let effectiveVelocity = Math.max(horse.velocity * (1 - fatigue), 0.2);
 
+        // Power-up effects (phase 4): applied on top of the base sim, never
+        // stored back into horse.velocity so they naturally wear off at expiry.
+        const now = Date.now();
+        for (const effect of handle.activeEffects(horse.lane, now)) {
+          if (effect.type === 'BOMB') {
+            effectiveVelocity = 0;
+          } else if (effect.type === 'TURBO') {
+            effectiveVelocity *= TURBO_MULTIPLIER;
+          } else if (effect.type === 'SLOW') {
+            effectiveVelocity *= SLOW_MULTIPLIER;
+          }
+        }
+
+        horse.effectiveVelocity = effectiveVelocity;
         horse.position = Math.min(horse.position + effectiveVelocity, TRACK_LENGTH);
 
         if (horse.position >= TRACK_LENGTH && !horse.finished) {
@@ -126,7 +248,7 @@ export class RaceEngineService {
           horses: state.map((h) => ({
             lane: h.lane,
             position: Math.round(h.position * 100) / 100,
-            speed: Math.round(h.velocity * 100) / 100,
+            speed: Math.round(h.effectiveVelocity * 100) / 100,
           })),
         });
       }
@@ -149,7 +271,7 @@ export class RaceEngineService {
       horses: state.map((h) => ({
         lane: h.lane,
         position: Math.round(h.position * 100) / 100,
-        speed: Math.round(h.velocity * 100) / 100,
+        speed: Math.round(h.effectiveVelocity * 100) / 100,
       })),
     });
 

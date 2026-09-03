@@ -1,19 +1,71 @@
 import {
   BadRequestException,
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { RaceStatus, type Player } from '@prisma/client';
+import { PowerUpType, RaceStatus, type Player } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { GameGateway } from './game.gateway.js';
 import { PlaceBetDto } from './dto/place-bet.dto.js';
 import { calculateOdds, type OddsSnapshot } from './odds.js';
-import { RaceEngineService, type HorseFinish } from './race-engine.service.js';
+import {
+  RaceEngineService,
+  RaceEngineHandle,
+  type HorseFinish,
+  type PowerUpEffectType,
+} from './race-engine.service.js';
 import { PlayersService } from '../players/players.service.js';
+
+/**
+ * Weighted power-up pool for the 2 grants each player gets at RACING start.
+ * TURBO/SLOW are common; BOMB/SHIELD are uncommon (the "counterplay" pair).
+ */
+const POWER_UP_POOL: { type: PowerUpType; weight: number }[] = [
+  { type: PowerUpType.TURBO, weight: 35 },
+  { type: PowerUpType.SLOW, weight: 35 },
+  { type: PowerUpType.BOMB, weight: 15 },
+  { type: PowerUpType.SHIELD, weight: 15 },
+];
+
+function pickWeightedPowerUp(): PowerUpType {
+  const totalWeight = POWER_UP_POOL.reduce((sum, p) => sum + p.weight, 0);
+  let roll = Math.random() * totalWeight;
+  for (const entry of POWER_UP_POOL) {
+    if (roll < entry.weight) return entry.type;
+    roll -= entry.weight;
+  }
+  return POWER_UP_POOL[0].type;
+}
+
+/**
+ * Narrow view of GameGateway used only so this constructor param's TYPE
+ * annotation doesn't force TS's emitDecoratorMetadata to eagerly reference
+ * the (circularly-imported) GameGateway class at module-eval time — see the
+ * matching comment in game.gateway.ts.
+ */
+interface GameGatewayPort {
+  emitBettingOpened(payload: { raceId: string; odds: OddsSnapshot }): void;
+  emitBettingClosed(payload: { raceId: string }): void;
+  emitOddsUpdated(payload: { raceId: string; odds: OddsSnapshot }): void;
+  emitRaceCountdown(payload: { raceId: string; count: number }): void;
+  emitRaceStarted(payload: { raceId: string }): void;
+  emitRaceEvent(payload: { raceId: string; type: string; [key: string]: unknown }): void;
+  emitRaceFinished(payload: { raceId: string; standings: HorseFinish[] }): void;
+  emitCoinsUpdatedTo(
+    socketIds: string[],
+    payload: { coins: number; reason: 'race_payout' | 'bailout' },
+  ): void;
+  emitPowerUpsReceivedTo(
+    socketIds: string[],
+    payload: { raceId: string; powerUps: { id: string; type: string }[] },
+  ): void;
+}
 
 /** Countdown broadcast before RACING begins, server-timed (no admin click). */
 const COUNTDOWN_FROM = 3;
@@ -34,10 +86,13 @@ export class GameService implements OnModuleInit {
   private readonly logger = new Logger(GameService.name);
   /** In-memory pointer to the single race "in flight" — no concurrent races this phase. */
   private currentRaceId: string | null = null;
+  /** Live handle into the running simulation, set for the duration of RACING only — lets `powerup:use` mutate it. */
+  private currentRaceEngineHandle: RaceEngineHandle | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly gameGateway: GameGateway,
+    @Inject(forwardRef(() => GameGateway))
+    private readonly gameGateway: GameGatewayPort,
     private readonly raceEngine: RaceEngineService,
     private readonly playersService: PlayersService,
   ) {}
@@ -164,20 +219,123 @@ export class GameService implements OnModuleInit {
     });
     this.gameGateway.emitRaceStarted({ raceId });
 
-    const finishes = await this.raceEngine.runRace(
-      raceId,
-      race.seed,
-      race.horses.map((rh) => ({
-        horseId: rh.horseId,
-        lane: rh.lane,
-        speed: rh.horse.speed,
-        acceleration: rh.horse.acceleration,
-        stamina: rh.horse.stamina,
-        chaos: rh.horse.chaos,
-      })),
-    );
+    // Grant power-ups right as RACING begins — after countdown, before the
+    // sim loop starts, so every connected player has them for the whole race.
+    await this.grantPowerUps(raceId);
 
-    await this.finishRace(raceId, finishes);
+    try {
+      const finishes = await this.raceEngine.runRace(
+        raceId,
+        race.seed,
+        race.horses.map((rh) => ({
+          horseId: rh.horseId,
+          lane: rh.lane,
+          speed: rh.horse.speed,
+          acceleration: rh.horse.acceleration,
+          stamina: rh.horse.stamina,
+          chaos: rh.horse.chaos,
+        })),
+        (handle) => {
+          this.currentRaceEngineHandle = handle;
+        },
+      );
+
+      await this.finishRace(raceId, finishes);
+    } finally {
+      this.currentRaceEngineHandle = null;
+    }
+  }
+
+  /** Grants each connected player 2 random power-ups for this race, persisted and pushed via socket. */
+  private async grantPowerUps(raceId: string) {
+    const players = this.playersService.getConnectedPlayers();
+
+    for (const player of players) {
+      const types = [pickWeightedPowerUp(), pickWeightedPowerUp()];
+      const created = await this.prisma.$transaction(
+        types.map((type) =>
+          this.prisma.playerPowerUp.create({
+            data: { playerId: player.playerId, raceId, type },
+          }),
+        ),
+      );
+
+      const socketIds = this.playersService.getSocketIdsForPlayer(player.playerId);
+      this.gameGateway.emitPowerUpsReceivedTo(socketIds, {
+        raceId,
+        powerUps: created.map((p) => ({ id: p.id, type: p.type })),
+      });
+    }
+  }
+
+  /**
+   * Server-authoritative power-up usage. The client sends only
+   * `{ powerupId, lane }` — everything about *what the power-up does* is
+   * decided here and in RaceEngineHandle, never on the client.
+   */
+  async usePowerUp(playerId: string, dto: { powerupId: string; lane: number }) {
+    if (!this.currentRaceId) {
+      throw new BadRequestException('No race in progress');
+    }
+    const raceId = this.currentRaceId;
+
+    const race = await this.prisma.race.findUnique({ where: { id: raceId } });
+    if (!race || race.status !== RaceStatus.RACING) {
+      throw new BadRequestException('Power-ups can only be used while the race is running');
+    }
+
+    const handle = this.currentRaceEngineHandle;
+    if (!handle) {
+      throw new BadRequestException('Race simulation is not active');
+    }
+
+    const powerUp = await this.prisma.playerPowerUp.findUnique({
+      where: { id: dto.powerupId },
+    });
+    if (!powerUp || powerUp.raceId !== raceId) {
+      throw new BadRequestException('Power-up not found for this race');
+    }
+    if (powerUp.playerId !== playerId) {
+      throw new BadRequestException('This power-up does not belong to you');
+    }
+    if (powerUp.used) {
+      throw new BadRequestException('Power-up already used');
+    }
+    if (!Number.isInteger(dto.lane) || dto.lane < 1 || dto.lane > 5 || !handle.hasLane(dto.lane)) {
+      throw new BadRequestException('Invalid target lane');
+    }
+    if (handle.isFinished(dto.lane)) {
+      throw new BadRequestException('That horse has already finished');
+    }
+
+    const result = handle.applyEffect(dto.lane, powerUp.type as PowerUpEffectType, Date.now());
+
+    await this.prisma.playerPowerUp.update({
+      where: { id: powerUp.id },
+      data: { used: true, targetLane: dto.lane, usedAt: new Date() },
+    });
+
+    const [player, raceHorse] = await Promise.all([
+      this.prisma.player.findUnique({ where: { id: playerId } }),
+      this.prisma.raceHorse.findUnique({
+        where: { raceId_lane: { raceId, lane: dto.lane } },
+        include: { horse: true },
+      }),
+    ]);
+
+    const eventType = result === 'blocked' ? 'powerup.blocked' : `powerup.${powerUp.type.toLowerCase()}`;
+
+    this.gameGateway.emitRaceEvent({
+      raceId,
+      type: eventType,
+      powerUpType: powerUp.type,
+      lane: dto.lane,
+      horseName: raceHorse?.horse.name ?? null,
+      playerId,
+      playerUsername: player?.username ?? 'Jugador',
+    });
+
+    return { result };
   }
 
   private async finishRace(raceId: string, finishes: HorseFinish[]) {

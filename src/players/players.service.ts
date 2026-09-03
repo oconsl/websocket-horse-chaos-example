@@ -45,4 +45,9 @@ export class PlayersService {
     }
     return socketIds;
   }
+
+  /** Resolves which player owns a given socket connection, or null if unregistered. */
+  getPlayerIdForSocket(socketId: string): string | null {
+    return this.connections.get(socketId)?.playerId ?? null;
+  }
 }
