@@ -171,3 +171,137 @@ a {
   border-radius: 8px;
   border: 1px solid rgba(128, 128, 128, 0.25);
 }
+
+.race-link {
+  display: inline-block;
+  margin-top: 1.5rem;
+  font-weight: 700;
+  color: #d4380d;
+}
+
+/* ---- Race / betting page ---- */
+
+.race-page {
+  flex: 1;
+  padding: 2rem;
+  position: relative;
+  max-width: 560px;
+}
+
+.race-status {
+  margin-top: 1rem;
+  opacity: 0.8;
+}
+
+.horse-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.horse-row {
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.horse-row--selected {
+  border-color: #d4380d;
+}
+
+.horse-row--mine {
+  border-color: #2f9e44;
+  background: rgba(47, 158, 68, 0.08);
+}
+
+.horse-row-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.horse-odds {
+  color: #d4380d;
+}
+
+.horse-pool-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.2);
+  overflow: hidden;
+  margin-bottom: 0.3rem;
+}
+
+.horse-pool-fill {
+  height: 100%;
+  background: #d4380d;
+  transition: width 0.2s ease;
+}
+
+.horse-pool-amount {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.bet-panel {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bet-stepper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bet-stepper button {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background: transparent;
+  color: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.bet-stepper button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.bet-amount {
+  font-weight: 700;
+  min-width: 6rem;
+  text-align: center;
+}
+
+.bet-submit {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: #d4380d;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.bet-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.bet-confirmation {
+  margin-top: 1.5rem;
+  font-weight: 700;
+  color: #2f9e44;
+}

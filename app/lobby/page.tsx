@@ -8,6 +8,7 @@ import { useSessionStore } from '@/store/session';
 import { useHydrateSession } from '@/lib/useHydrateSession';
 
 interface LobbyPlayer {
+  playerId: string;
   username: string;
   coins: number;
 }
@@ -81,13 +82,17 @@ export default function LobbyPage() {
       </p>
 
       <ul className="player-list">
-        {lobby?.players.map((player, i) => (
-          <li key={`${player.username}-${i}`}>
+        {lobby?.players.map((player) => (
+          <li key={player.playerId}>
             <span>{player.username}</span>
             <span>{player.coins} coins</span>
           </li>
         ))}
       </ul>
+
+      <a className="race-link" href="/race">
+        Ir a la carrera →
+      </a>
     </main>
   );
 }
