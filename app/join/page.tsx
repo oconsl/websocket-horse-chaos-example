@@ -4,6 +4,8 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { API_URL } from '@/lib/config';
 import { useSessionStore } from '@/store/session';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 
 export default function JoinPage() {
   const router = useRouter();
@@ -47,7 +49,7 @@ export default function JoinPage() {
 
   return (
     <main className="join-page">
-      <div className="join-card">
+      <Card className="join-card">
         <h1>Horse Chaos</h1>
         <p className="subtitle">Ingresá tu nombre para entrar al lobby</p>
 
@@ -61,13 +63,13 @@ export default function JoinPage() {
             required
             autoFocus
           />
-          <button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading}>
             {loading ? 'ENTRANDO...' : 'ENTRAR'}
-          </button>
+          </Button>
         </form>
 
         {error && <p className="error">{error}</p>}
-      </div>
+      </Card>
     </main>
   );
 }

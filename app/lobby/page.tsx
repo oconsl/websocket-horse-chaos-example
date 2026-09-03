@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getGameSocket } from '@/lib/socket';
 import { useSessionStore } from '@/store/session';
 import { useHydrateSession } from '@/lib/useHydrateSession';
+import { Badge } from '@/components/ui/Badge';
 
 interface LobbyPlayer {
   playerId: string;
@@ -72,7 +73,7 @@ export default function LobbyPage() {
     <main className="lobby-page">
       <div className="player-badge">
         <span className="badge-username">{session.username}</span>
-        <span className="badge-coins">{session.coins} coins</span>
+        <Badge>{session.coins} coins</Badge>
       </div>
 
       <h1>Lobby</h1>

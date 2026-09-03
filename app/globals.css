@@ -1,13 +1,61 @@
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #faf3e6;
+  --bg-elevated: #ffffff;
+  --text: #171717;
+  --text-muted: rgba(23, 23, 23, 0.65);
+  --accent-primary: #d4380d;
+  /* Horse-lane order matches api's alphabetical seed (game.service.ts createRace):
+     1 CSS Master, 2 El Backend, 3 NullPointer, 4 Segmentation Fault, 5 localhost:3000 */
+  --accent-horse-1: #2f9e44;
+  --accent-horse-2: #d4380d;
+  --accent-horse-3: #1c5fd4;
+  --accent-horse-4: #e0a800;
+  --accent-horse-5: #7c3fd4;
+  --success: #2f9e44;
+  --danger: #e5484d;
+
+  --background: var(--bg);
+  --foreground: var(--text);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --bg: #05060f;
+    --bg-elevated: #10132a;
+    --text: #ededed;
+    --text-muted: rgba(237, 237, 237, 0.65);
+    --accent-primary: #ff5a3c;
+    --accent-horse-1: #4ade80;
+    --accent-horse-2: #ff5a3c;
+    --accent-horse-3: #4d8dff;
+    --accent-horse-4: #ffd60a;
+    --accent-horse-5: #b565ff;
+    --success: #4ade80;
+    --danger: #ff6b6e;
+
+    color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #05060f;
+  --bg-elevated: #10132a;
+  --text: #ededed;
+  --text-muted: rgba(237, 237, 237, 0.65);
+  --accent-primary: #ff5a3c;
+  --accent-horse-1: #4ade80;
+  --accent-horse-2: #ff5a3c;
+  --accent-horse-3: #4d8dff;
+  --accent-horse-4: #ffd60a;
+  --accent-horse-5: #b565ff;
+  --success: #4ade80;
+  --danger: #ff6b6e;
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 html {
@@ -24,8 +72,8 @@ body {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  color: var(--foreground);
-  background: var(--background);
+  color: var(--text);
+  background: var(--bg);
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -42,10 +90,22 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+.theme-toggle-wrap {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 50;
+}
+
+.theme-toggle-button {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
 }
 
 /* ---- Horse Chaos: join / lobby / loading pages ---- */
@@ -68,9 +128,6 @@ a {
 .join-card {
   width: 100%;
   max-width: 360px;
-  padding: 2rem;
-  border: 1px solid rgba(128, 128, 128, 0.3);
-  border-radius: 12px;
   text-align: center;
 }
 
@@ -100,32 +157,16 @@ a {
   font-size: 1rem;
 }
 
-.join-card button {
-  padding: 0.65rem 0.75rem;
-  border-radius: 8px;
-  border: none;
-  background: #d4380d;
-  color: #fff;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.join-card button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 .error {
   margin-top: 1rem;
-  color: #e5484d;
+  color: var(--danger);
   font-size: 0.9rem;
 }
 
 .lobby-page {
   flex: 1;
   padding: 2rem;
+  padding-top: 3.75rem;
   position: relative;
 }
 
@@ -176,7 +217,7 @@ a {
   display: inline-block;
   margin-top: 1.5rem;
   font-weight: 700;
-  color: #d4380d;
+  color: var(--accent-primary);
 }
 
 .lobby-nav {
@@ -189,6 +230,7 @@ a {
 .leaderboard-page {
   flex: 1;
   padding: 2rem;
+  padding-top: 3.75rem;
   max-width: 480px;
 }
 
@@ -210,8 +252,8 @@ a {
 }
 
 .leaderboard-row--me {
-  border-color: #d4380d;
-  background: rgba(212, 56, 13, 0.08);
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
 }
 
 .leaderboard-rank {
@@ -232,6 +274,7 @@ a {
 .race-page {
   flex: 1;
   padding: 2rem;
+  padding-top: 3.75rem;
   position: relative;
   max-width: 560px;
 }
@@ -258,12 +301,12 @@ a {
 }
 
 .horse-row--selected {
-  border-color: #d4380d;
+  border-color: var(--accent-primary);
 }
 
 .horse-row--mine {
-  border-color: #2f9e44;
-  background: rgba(47, 158, 68, 0.08);
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
 }
 
 .horse-row-header {
@@ -273,8 +316,14 @@ a {
   margin-bottom: 0.4rem;
 }
 
+.horse-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .horse-odds {
-  color: #d4380d;
+  color: var(--accent-primary);
 }
 
 .horse-pool-bar {
@@ -287,7 +336,7 @@ a {
 
 .horse-pool-fill {
   height: 100%;
-  background: #d4380d;
+  background: var(--accent-primary);
   transition: width 0.2s ease;
 }
 
@@ -303,55 +352,10 @@ a {
   gap: 0.75rem;
 }
 
-.bet-stepper {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.bet-stepper button {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 8px;
-  border: 1px solid rgba(128, 128, 128, 0.4);
-  background: transparent;
-  color: inherit;
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-
-.bet-stepper button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.bet-amount {
-  font-weight: 700;
-  min-width: 6rem;
-  text-align: center;
-}
-
-.bet-submit {
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  border: none;
-  background: #d4380d;
-  color: #fff;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.bet-submit:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
 .bet-confirmation {
   margin-top: 1.5rem;
   font-weight: 700;
-  color: #2f9e44;
+  color: var(--success);
 }
 
 /* ---- Track / countdown / results (phase 3) ---- */
@@ -375,6 +379,31 @@ a {
   gap: 0.25rem;
 }
 
+.track-lane--hit .track-lane-rail {
+  animation: track-lane-hit 450ms ease;
+}
+
+@keyframes track-lane-hit {
+  0%, 100% {
+    transform: translateX(0);
+    box-shadow: none;
+  }
+  20% {
+    transform: translateX(-4px);
+    box-shadow: 0 0 0 2px var(--danger);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-3px);
+    box-shadow: 0 0 0 2px var(--danger);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
 .track-lane-label {
   font-size: 0.8rem;
   font-weight: 700;
@@ -390,12 +419,102 @@ a {
   overflow: hidden;
 }
 
+/* ---- Race track landscape (phase 4) ---- */
+
+.race-track-bg {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  padding: 1.75rem 1.25rem 1rem;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--text) 5%, transparent) 0px,
+      color-mix(in srgb, var(--text) 5%, transparent) 2px,
+      transparent 2px,
+      transparent 28px
+    ),
+    linear-gradient(to bottom, var(--bg-elevated), var(--bg) 70%);
+  background-size: 28px 100%, auto;
+}
+
+.race-track-bg--racing {
+  animation: race-track-scroll 1.1s linear infinite;
+}
+
+@keyframes race-track-scroll {
+  from {
+    background-position: 0 0, 0 0;
+  }
+  to {
+    background-position: -28px 0, 0 0;
+  }
+}
+
+.race-track-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1.1rem;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--text) 35%, transparent) 30%,
+    transparent 31%
+  );
+  background-size: 12px 12px;
+  filter: blur(2px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.race-track-bg::after {
+  content: '';
+  position: absolute;
+  top: 1.1rem;
+  bottom: 0.4rem;
+  right: 0.6rem;
+  width: 8px;
+  border-radius: 3px;
+  background-image: repeating-conic-gradient(
+    var(--text) 0% 25%,
+    var(--bg-elevated) 0% 50%
+  );
+  background-size: 8px 8px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.race-track-bg .track {
+  position: relative;
+}
+
 .track-horse {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  font-size: 1.3rem;
+  display: flex;
   transition: left 100ms linear;
+}
+
+.track-horse--finished {
+  animation: track-horse-bounce 600ms ease;
+}
+
+@keyframes track-horse-bounce {
+  0%, 100% {
+    transform: translate(-50%, -50%);
+  }
+  30% {
+    transform: translate(-50%, -140%) scale(1.15);
+  }
+  55% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    transform: translate(-50%, -85%) scale(1.05);
+  }
 }
 
 /* ---- Power-ups (phase 4) ---- */
@@ -422,22 +541,10 @@ a {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.6rem 0.9rem;
-  border-radius: 10px;
-  border: 1px solid rgba(128, 128, 128, 0.35);
-  background: transparent;
-  color: inherit;
-  font-weight: 700;
-  cursor: pointer;
 }
 
 .powerup-card-button--selected {
-  border-color: #d4380d;
-}
-
-.powerup-card-button:disabled {
-  opacity: 0.4;
-  cursor: default;
+  border-color: var(--accent-primary);
 }
 
 .powerup-emoji {
@@ -460,32 +567,12 @@ a {
 .lane-pick {
   width: 2.2rem;
   height: 2.2rem;
-  border-radius: 8px;
-  border: 1px solid rgba(128, 128, 128, 0.4);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
   font-size: 0.85rem;
 }
 
 .lane-pick--selected {
-  border-color: #d4380d;
-  background: rgba(212, 56, 13, 0.1);
-}
-
-.powerup-submit {
-  padding: 0.5rem 0.9rem;
-  border-radius: 8px;
-  border: none;
-  background: #d4380d;
-  color: #fff;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.powerup-submit:disabled {
-  opacity: 0.5;
-  cursor: default;
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
 }
 
 .event-feed h2 {
@@ -498,16 +585,29 @@ a {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  max-height: 220px;
-  overflow-y: auto;
   font-size: 0.85rem;
-  opacity: 0.9;
 }
 
 .event-feed li {
   padding: 0.4rem 0.6rem;
   border-radius: 6px;
   background: rgba(128, 128, 128, 0.08);
+  animation: event-toast-life 4s ease forwards;
+}
+
+@keyframes event-toast-life {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  10%, 82% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 .countdown-overlay {
@@ -524,14 +624,79 @@ a {
   font-size: 8rem;
   font-weight: 900;
   color: #fff;
+  display: inline-block;
+  animation: countdown-pulse 1s ease;
+}
+
+@keyframes countdown-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .results-panel {
   margin-top: 1.5rem;
+  position: relative;
+  overflow: hidden;
 }
 
 .results-panel h2 {
   margin-bottom: 0.75rem;
+}
+
+.podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.podium-place {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.75rem 0.5rem 0.6rem;
+  border-radius: 10px 10px 0 0;
+  border: 1px solid rgba(128, 128, 128, 0.25);
+  background: color-mix(in srgb, var(--bg-elevated) 80%, transparent);
+  min-width: 4.5rem;
+}
+
+.podium-medal {
+  font-size: 1.4rem;
+}
+
+.podium-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.podium-place--1 {
+  order: 2;
+  padding-top: 1.4rem;
+  border-color: var(--accent-horse-4);
+}
+
+.podium-place--2 {
+  order: 1;
+  padding-top: 0.5rem;
+}
+
+.podium-place--3 {
+  order: 3;
+  padding-top: 0.25rem;
 }
 
 .standings-list {
@@ -565,20 +730,48 @@ a {
   border: 1px solid rgba(128, 128, 128, 0.3);
 }
 
+.payout-banner--result {
+  font-size: 1.3rem;
+  font-weight: 900;
+  text-align: center;
+  padding: 1.25rem 1.1rem;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -10%;
+  width: 8px;
+  height: 14px;
+  opacity: 0.9;
+  animation: confetti-fall 2.4s ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(220px) rotate(540deg);
+    opacity: 0;
+  }
+}
+
 .payout-banner--win {
-  color: #2f9e44;
-  border-color: #2f9e44;
-  background: rgba(47, 158, 68, 0.08);
+  color: var(--success);
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
 }
 
 .payout-banner--loss {
-  color: #e5484d;
-  border-color: #e5484d;
-  background: rgba(229, 72, 77, 0.08);
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
 }
 
 .payout-banner--bailout {
-  color: #d4380d;
-  border-color: #d4380d;
-  background: rgba(212, 56, 13, 0.08);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
 }

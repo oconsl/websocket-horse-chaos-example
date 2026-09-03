@@ -7,6 +7,12 @@ import { API_URL } from '@/lib/config';
 import { getGameSocket } from '@/lib/socket';
 import { useSessionStore } from '@/store/session';
 import { useHydrateSession } from '@/lib/useHydrateSession';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Stepper } from '@/components/ui/Stepper';
+import { HorseAvatar } from '@/components/horses/HorseAvatar';
+import { Confetti } from '@/components/ui/Confetti';
 
 type RaceStatus = 'WAITING' | 'BETTING' | 'BETTING_CLOSED' | 'COUNTDOWN' | 'RACING' | 'RESULTS';
 
@@ -132,6 +138,7 @@ export default function RacePage() {
   const [selectedLane, setSelectedLane] = useState<number | null>(null);
   const [powerUpError, setPowerUpError] = useState<string | null>(null);
   const pendingPowerUpIdRef = useRef<string | null>(null);
+  const [hitLane, setHitLane] = useState<number | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -322,6 +329,18 @@ export default function RacePage() {
     };
   }, [session?.sessionToken, setCoins]);
 
+  // Flash/shake the lane a power-up just landed on (visual-only, purely
+  // reacting to the already-received race:event stream).
+  useEffect(() => {
+    const latest = events[0];
+    if (!latest || typeof latest.lane !== 'number') return;
+    if (!latest.type.startsWith('powerup.')) return;
+
+    setHitLane(latest.lane);
+    const timeout = setTimeout(() => setHitLane(null), 450);
+    return () => clearTimeout(timeout);
+  }, [events]);
+
   const maxBet = useMemo(() => {
     const coins = session?.coins ?? 0;
     return Math.max(BET_STEP, Math.floor(coins / BET_STEP) * BET_STEP);
@@ -342,6 +361,11 @@ export default function RacePage() {
     race?.odds.horses.forEach((h) => map.set(h.lane, h.name));
     return map;
   }, [race]);
+
+  const finishedLanes = useMemo(
+    () => new Set((standings ?? []).map((s) => s.lane)),
+    [standings],
+  );
 
   function adjustBet(delta: number) {
     setBetAmount((current) => {
@@ -400,7 +424,7 @@ export default function RacePage() {
     <main className="race-page">
       <div className="player-badge">
         <span className="badge-username">{session.username}</span>
-        <span className="badge-coins">{session.coins} coins</span>
+        <Badge>{session.coins} coins</Badge>
       </div>
 
       <h1>Elegí tu caballo</h1>
@@ -440,6 +464,7 @@ export default function RacePage() {
                 >
                   <div className="horse-row-header">
                     <span className="horse-name">
+                      <HorseAvatar lane={horse.lane} />
                       #{horse.lane} {horse.name}
                     </span>
                     <span className="horse-odds">
@@ -456,26 +481,24 @@ export default function RacePage() {
           </ul>
 
           {race.status === 'BETTING' && !confirmedBet && (
-            <div className="bet-panel">
-              <div className="bet-stepper">
-                <button type="button" onClick={() => adjustBet(-BET_STEP)} disabled={betAmount <= BET_STEP}>
-                  −
-                </button>
-                <span className="bet-amount">{betAmount} coins</span>
-                <button type="button" onClick={() => adjustBet(BET_STEP)} disabled={betAmount >= maxBet}>
-                  +
-                </button>
-              </div>
-              <button
-                type="button"
-                className="bet-submit"
+            <Card className="bet-panel">
+              <Stepper
+                value={betAmount}
+                unit="coins"
+                onDecrement={() => adjustBet(-BET_STEP)}
+                onIncrement={() => adjustBet(BET_STEP)}
+                decrementDisabled={betAmount <= BET_STEP}
+                incrementDisabled={betAmount >= maxBet}
+              />
+              <Button
                 disabled={!selectedHorseId || submitting || betAmount > session.coins}
+                loading={submitting}
                 onClick={placeBet}
               >
                 {submitting ? 'APOSTANDO...' : 'APOSTAR'}
-              </button>
+              </Button>
               {error && <p className="error">{error}</p>}
-            </div>
+            </Card>
           )}
 
           {confirmedBet && (
@@ -489,33 +512,41 @@ export default function RacePage() {
 
       {isTrackPhase && (
         <div className="track-wrap">
-          <div className="track">
-            {race.odds.horses
-              .slice()
-              .sort((a, b) => a.lane - b.lane)
-              .map((horse) => {
-                const snap = horsePositions.find((h) => h.lane === horse.lane);
-                const pct = snap ? Math.min(100, (snap.position / TRACK_LENGTH) * 100) : 0;
-                const isMine = confirmedBet?.horseId === horse.horseId;
+          <div className={`race-track-bg${race.status === 'RACING' ? ' race-track-bg--racing' : ''}`}>
+            <div className="track">
+              {race.odds.horses
+                .slice()
+                .sort((a, b) => a.lane - b.lane)
+                .map((horse) => {
+                  const snap = horsePositions.find((h) => h.lane === horse.lane);
+                  const pct = snap ? Math.min(100, (snap.position / TRACK_LENGTH) * 100) : 0;
+                  const isMine = confirmedBet?.horseId === horse.horseId;
 
-                return (
-                  <div key={horse.lane} className="track-lane">
-                    <span className="track-lane-label">
-                      #{horse.lane} {horse.name}
-                      {isMine ? ' 🎯' : ''}
-                    </span>
-                    <div className="track-lane-rail">
-                      <span className="track-horse" style={{ left: `${pct}%` }}>
-                        🐎
+                  return (
+                    <div
+                      key={horse.lane}
+                      className={`track-lane${hitLane === horse.lane ? ' track-lane--hit' : ''}`}
+                    >
+                      <span className="track-lane-label">
+                        #{horse.lane} {horse.name}
+                        {isMine ? ' 🎯' : ''}
                       </span>
+                      <div className="track-lane-rail">
+                        <span
+                          className={`track-horse${finishedLanes.has(horse.lane) ? ' track-horse--finished' : ''}`}
+                          style={{ left: `${pct}%` }}
+                        >
+                          <HorseAvatar lane={horse.lane} running={race.status === 'RACING'} />
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+            </div>
           </div>
 
           {race.status === 'RACING' && powerUps.length > 0 && (
-            <div className="powerups-panel">
+            <Card className="powerups-panel">
               <h2>Tus poderes</h2>
               {powerUpError && <p className="error">{powerUpError}</p>}
               <ul className="powerups-list">
@@ -526,8 +557,8 @@ export default function RacePage() {
 
                   return (
                     <li key={powerUp.id} className="powerup-card">
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
                         className={`powerup-card-button${isSelected ? ' powerup-card-button--selected' : ''}`}
                         disabled={isUsed}
                         onClick={() => {
@@ -539,43 +570,42 @@ export default function RacePage() {
                         <span className="powerup-emoji">{info.emoji}</span>
                         <span>{info.label}</span>
                         {isUsed && <span className="powerup-used-tag">usado</span>}
-                      </button>
+                      </Button>
 
                       {isSelected && !isUsed && (
                         <div className="powerup-lane-picker">
                           {[1, 2, 3, 4, 5].map((lane) => (
-                            <button
-                              type="button"
+                            <Button
+                              variant="ghost"
                               key={lane}
                               className={`lane-pick${selectedLane === lane ? ' lane-pick--selected' : ''}`}
                               onClick={() => setSelectedLane(lane)}
                             >
                               #{lane}
-                            </button>
+                            </Button>
                           ))}
-                          <button
-                            type="button"
+                          <Button
                             className="powerup-submit"
                             disabled={!selectedLane}
                             onClick={() => usePowerUp(powerUp.id)}
                           >
                             USAR
-                          </button>
+                          </Button>
                         </div>
                       )}
                     </li>
                   );
                 })}
               </ul>
-            </div>
+            </Card>
           )}
 
           {events.length > 0 && (
             <div className="event-feed">
               <h2>Eventos</h2>
               <ul>
-                {events.map((event, i) => (
-                  <li key={i}>{describeEvent(event, horseNameByLane)}</li>
+                {events.slice(0, 4).map((event, i) => (
+                  <li key={events.length - i}>{describeEvent(event, horseNameByLane)}</li>
                 ))}
               </ul>
             </div>
@@ -585,13 +615,35 @@ export default function RacePage() {
 
       {race && race.status === 'COUNTDOWN' && countdown !== null && (
         <div className="countdown-overlay">
-          <span className="countdown-number">{countdown}</span>
+          <span key={countdown} className="countdown-number">
+            {countdown}
+          </span>
         </div>
       )}
 
       {race && race.status === 'RESULTS' && standings && (
-        <div className="results-panel">
+        <Card className="results-panel">
+          <Confetti />
           <h2>Resultados</h2>
+
+          {(() => {
+            const sorted = standings.slice().sort((a, b) => a.place - b.place);
+            const medals = ['🥇', '🥈', '🥉'];
+            return (
+              <ol className="podium">
+                {sorted.slice(0, 3).map((finish, i) => (
+                  <li key={finish.lane} className={`podium-place podium-place--${i + 1}`}>
+                    <span className="podium-medal">{medals[i]}</span>
+                    <HorseAvatar lane={finish.lane} />
+                    <span className="podium-name">
+                      {horseNameByLane.get(finish.lane) ?? finish.horseId}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            );
+          })()}
+
           <ol className="standings-list">
             {standings
               .slice()
@@ -612,7 +664,7 @@ export default function RacePage() {
 
           {results?.myBet && (
             <div
-              className={`payout-banner${
+              className={`payout-banner payout-banner--result${
                 results.myBet.payout && results.myBet.payout > 0
                   ? ' payout-banner--win'
                   : ' payout-banner--loss'
@@ -621,7 +673,7 @@ export default function RacePage() {
               {results.myBet.payout && results.myBet.payout > 0 ? (
                 <p>GANASTE 🎉 +{results.myBet.payout} coins</p>
               ) : (
-                <p>perdiste 😢 (apostaste {results.myBet.amount} coins)</p>
+                <p>PERDISTE 😢 (apostaste {results.myBet.amount} coins)</p>
               )}
             </div>
           )}
@@ -632,10 +684,8 @@ export default function RacePage() {
             </div>
           )}
 
-          {payout && (
-            <p className="badge-coins">Coins actuales: {payout.coins}</p>
-          )}
-        </div>
+          {payout && <Badge>Coins actuales: {payout.coins}</Badge>}
+        </Card>
       )}
     </main>
   );

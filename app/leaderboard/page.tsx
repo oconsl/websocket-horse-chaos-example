@@ -7,6 +7,9 @@ import { API_URL } from '@/lib/config';
 import { getGameSocket } from '@/lib/socket';
 import { useSessionStore } from '@/store/session';
 import { useHydrateSession } from '@/lib/useHydrateSession';
+import { Badge } from '@/components/ui/Badge';
+
+const RANK_MEDAL: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
 interface LeaderboardEntry {
   rank: number;
@@ -76,7 +79,7 @@ export default function LeaderboardPage() {
     <main className="leaderboard-page">
       <div className="player-badge">
         <span className="badge-username">{session.username}</span>
-        <span className="badge-coins">{session.coins} coins</span>
+        <Badge>{session.coins} coins</Badge>
       </div>
 
       <h1>🏆 Tabla de posiciones</h1>
@@ -92,9 +95,11 @@ export default function LeaderboardPage() {
                 entry.playerId === session.playerId ? ' leaderboard-row--me' : ''
               }`}
             >
-              <span className="leaderboard-rank">#{entry.rank}</span>
+              <span className="leaderboard-rank">
+                {RANK_MEDAL[entry.rank] ?? `#${entry.rank}`}
+              </span>
               <span className="leaderboard-username">{entry.username}</span>
-              <span className="leaderboard-coins">{entry.coins} coins</span>
+              <Badge className="leaderboard-coins">{entry.coins} coins</Badge>
             </li>
           ))}
         </ol>

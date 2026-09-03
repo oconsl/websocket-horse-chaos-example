@@ -1,0 +1,44 @@
+.avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.running {
+  animation: gallop 0.4s ease-in-out infinite;
+}
+
+@keyframes gallop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.tank {
+  filter: drop-shadow(0 0 0 currentColor);
+}
+
+.glitchLayer {
+  mix-blend-mode: screen;
+}
+
+.crack {
+  stroke: var(--bg);
+}
+
+.ghost {
+  opacity: 0.7;
+}
+
+.scanlines {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 0.5;
+  stroke-dasharray: 1 3;
+  opacity: 0.4;
+}

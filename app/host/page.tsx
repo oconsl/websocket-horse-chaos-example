@@ -59,7 +59,7 @@ export default function HostPage() {
   }
 
   return (
-    <main style={{ padding: '2rem', fontFamily: 'monospace' }}>
+    <main style={{ padding: '2rem', paddingTop: '3.75rem', fontFamily: 'monospace' }}>
       <h1>Host panel (demo)</h1>
       <p>Race ID: {raceId || '(none)'}</p>
       <p>Status: {status || '(none)'}</p>
