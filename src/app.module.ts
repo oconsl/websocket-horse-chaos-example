@@ -5,6 +5,7 @@ import { AppService } from './app.service.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SessionsModule } from './sessions/sessions.module.js';
 import { PlayersModule } from './players/players.module.js';
+import { GameModule } from './game/game.module.js';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { PlayersModule } from './players/players.module.js';
     PrismaModule,
     SessionsModule,
     PlayersModule,
+    GameModule,
   ],
   controllers: [AppController],
   providers: [AppService],

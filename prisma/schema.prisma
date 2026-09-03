@@ -15,4 +15,61 @@ model Player {
   sessionToken String   @unique
   coins        Int      @default(1000)
   createdAt    DateTime @default(now())
+  bets         Bet[]
+}
+
+enum RaceStatus {
+  WAITING
+  BETTING
+  BETTING_CLOSED
+  COUNTDOWN
+  RACING
+  RESULTS
+}
+
+model Race {
+  id         String      @id @default(uuid())
+  status     RaceStatus  @default(WAITING)
+  seed       String
+  createdAt  DateTime    @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+  horses     RaceHorse[]
+  bets       Bet[]
+}
+
+model Horse {
+  id           String      @id @default(uuid())
+  name         String      @unique
+  speed        Int         @default(50)
+  acceleration Int         @default(50)
+  stamina      Int         @default(50)
+  chaos        Int         @default(50)
+  raceHorses   RaceHorse[]
+}
+
+model RaceHorse {
+  id             String  @id @default(uuid())
+  raceId         String
+  race           Race    @relation(fields: [raceId], references: [id])
+  horseId        String
+  horse          Horse   @relation(fields: [horseId], references: [id])
+  lane           Int
+  finishPosition Int?
+
+  @@unique([raceId, lane])
+  @@unique([raceId, horseId])
+}
+
+model Bet {
+  id        String   @id @default(uuid())
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id])
+  raceId    String
+  race      Race     @relation(fields: [raceId], references: [id])
+  horseId   String
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@unique([playerId, raceId])
 }

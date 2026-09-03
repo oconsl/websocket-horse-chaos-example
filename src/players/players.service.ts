@@ -26,7 +26,11 @@ export class PlayersService {
   getLobbySnapshot() {
     const players = this.getConnectedPlayers();
     return {
-      players: players.map(({ username, coins }) => ({ username, coins })),
+      players: players.map(({ playerId, username, coins }) => ({
+        playerId,
+        username,
+        coins,
+      })),
       count: players.length,
     };
   }
