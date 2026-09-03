@@ -27,7 +27,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && node dist/main"
+    command: sh -c "pnpm exec prisma migrate deploy && node dist/main"
 
 volumes:
   pgdata:
