@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Socket } from 'socket.io-client';
 import { API_URL } from '@/lib/config';
-import { createGameSocket } from '@/lib/socket';
+import { getGameSocket } from '@/lib/socket';
 import { useSessionStore } from '@/store/session';
 import { useHydrateSession } from '@/lib/useHydrateSession';
 
@@ -87,6 +87,20 @@ interface RaceResults {
   myBet: { horseId: string; amount: number; payout: number | null } | null;
 }
 
+/**
+ * Server-authoritative session-resume payload (design doc §16): sent right
+ * after connecting/reconnecting so a refreshed or dropped-and-reconnected
+ * client rehydrates coins/bet/power-ups/race-position instead of starting
+ * from a blank slate. The client never asserts any of this itself.
+ */
+interface ResumeSnapshot {
+  race: RaceSnapshot | null;
+  myBet: ConfirmedBet | null;
+  powerUps: { id: string; type: PowerUpType; used: boolean }[];
+  horsePositions: RaceHorseSnapshot[];
+  results: RaceResults | null;
+}
+
 /** Matches api/src/game/race-engine.service.ts TRACK_LENGTH. */
 const TRACK_LENGTH = 1000;
 const BET_STEP = 50;
@@ -151,14 +165,15 @@ export default function RacePage() {
     };
   }, []);
 
-  // Live odds/status/race via socket.
+  // Live odds/status/race via the shared socket — reuse it, add/remove only
+  // this page's own listeners, never disconnect it here (see lib/socket.ts).
   useEffect(() => {
     if (!session?.sessionToken) return;
 
-    const socket = createGameSocket(session.sessionToken);
+    const socket = getGameSocket(session.sessionToken);
     socketRef.current = socket;
 
-    socket.on('betting:opened', (payload: { raceId: string; odds: OddsSnapshot }) => {
+    function handleBettingOpened(payload: { raceId: string; odds: OddsSnapshot }) {
       setRace({ id: payload.raceId, status: 'BETTING', odds: payload.odds });
       setConfirmedBet(null);
       setSelectedHorseId(null);
@@ -174,37 +189,41 @@ export default function RacePage() {
       setSelectedLane(null);
       setPowerUpError(null);
       pendingPowerUpIdRef.current = null;
-    });
+    }
 
-    socket.on('betting:closed', (payload: { raceId: string }) => {
+    function handleBettingClosed(payload: { raceId: string }) {
       setRace((prev) =>
         prev && prev.id === payload.raceId ? { ...prev, status: 'BETTING_CLOSED' } : prev,
       );
-    });
+    }
 
-    socket.on('odds:updated', (payload: { raceId: string; odds: OddsSnapshot }) => {
+    function handleOddsUpdated(payload: { raceId: string; odds: OddsSnapshot }) {
       setRace((prev) => (prev && prev.id === payload.raceId ? { ...prev, odds: payload.odds } : prev));
-    });
+    }
 
-    socket.on('race:countdown', (payload: { raceId: string; count: number }) => {
+    function handleRaceCountdown(payload: { raceId: string; count: number }) {
       setRace((prev) => (prev ? { ...prev, status: 'COUNTDOWN' } : prev));
       setCountdown(payload.count);
-    });
+    }
 
-    socket.on('race:started', () => {
+    function handleRaceStarted() {
       setRace((prev) => (prev ? { ...prev, status: 'RACING' } : prev));
       setCountdown(null);
-    });
+    }
 
-    socket.on('race:update', (payload: { raceId: string; horses: RaceHorseSnapshot[] }) => {
+    function handleRaceUpdate(payload: { raceId: string; horses: RaceHorseSnapshot[] }) {
       setHorsePositions(payload.horses);
-    });
+    }
 
-    socket.on('race:event', (payload: RaceEventPayload) => {
+    function handleRaceEvent(payload: RaceEventPayload) {
       setEvents((prev) => [payload, ...prev].slice(0, 30));
-    });
+      // Server-authoritative: we optimistically mark a power-up used the
+      // moment we emit `powerup:use` (see usePowerUp below); this just
+      // clears the pending flag once the server confirms.
+      pendingPowerUpIdRef.current = null;
+    }
 
-    socket.on('race:finished', (payload: { raceId: string; standings: HorseFinish[] }) => {
+    function handleRaceFinished(payload: { raceId: string; standings: HorseFinish[] }) {
       setRace((prev) => (prev ? { ...prev, status: 'RESULTS' } : prev));
       setStandings(payload.standings);
 
@@ -218,25 +237,18 @@ export default function RacePage() {
           if (data) setResults(data);
         })
         .catch(() => {});
-    });
+    }
 
-    socket.on('coins:updated', (payload: CoinsUpdatedPayload) => {
+    function handleCoinsUpdated(payload: CoinsUpdatedPayload) {
       setCoins(payload.coins);
       setPayout(payload);
-    });
+    }
 
-    socket.on('powerup:received', (payload: PowerUpReceivedPayload) => {
+    function handlePowerUpReceived(payload: PowerUpReceivedPayload) {
       setPowerUps(payload.powerUps);
-    });
+    }
 
-    // Server-authoritative: we optimistically mark a power-up used the
-    // moment we emit `powerup:use` (see usePowerUp below); this just clears
-    // the pending flag once the server confirms via race:event.
-    socket.on('race:event', () => {
-      pendingPowerUpIdRef.current = null;
-    });
-
-    socket.on('game:error', (payload: GameErrorPayload) => {
+    function handleGameError(payload: GameErrorPayload) {
       setPowerUpError(payload.message);
       // Roll back the optimistic "used" mark if the server rejected our attempt.
       const pendingId = pendingPowerUpIdRef.current;
@@ -248,10 +260,64 @@ export default function RacePage() {
         });
         pendingPowerUpIdRef.current = null;
       }
-    });
+    }
+
+    // Session resume (design doc §16): rehydrate from the server's snapshot
+    // instead of sitting blank until the next live tick. Fired by lib/socket
+    // on every connect/reconnect; also fired once here so navigating into
+    // this page on an already-connected socket gets a snapshot too.
+    function handleSessionResumed(payload: ResumeSnapshot) {
+      if (payload.race) {
+        setRace(payload.race);
+      }
+      if (payload.myBet) {
+        setConfirmedBet(payload.myBet);
+      }
+      if (payload.powerUps.length > 0) {
+        setPowerUps(payload.powerUps.map(({ id, type }) => ({ id, type })));
+        setUsedPowerUpIds(
+          new Set(payload.powerUps.filter((p) => p.used).map((p) => p.id)),
+        );
+      }
+      if (payload.horsePositions.length > 0) {
+        setHorsePositions(payload.horsePositions);
+      }
+      if (payload.results) {
+        setResults(payload.results);
+        setStandings(
+          payload.results.standings.map(({ lane, horseId, place }) => ({ lane, horseId, place })),
+        );
+      }
+    }
+
+    socket.on('betting:opened', handleBettingOpened);
+    socket.on('betting:closed', handleBettingClosed);
+    socket.on('odds:updated', handleOddsUpdated);
+    socket.on('race:countdown', handleRaceCountdown);
+    socket.on('race:started', handleRaceStarted);
+    socket.on('race:update', handleRaceUpdate);
+    socket.on('race:event', handleRaceEvent);
+    socket.on('race:finished', handleRaceFinished);
+    socket.on('coins:updated', handleCoinsUpdated);
+    socket.on('powerup:received', handlePowerUpReceived);
+    socket.on('game:error', handleGameError);
+    socket.on('session:resumed', handleSessionResumed);
+
+    socket.emit('session:resume');
 
     return () => {
-      socket.disconnect();
+      socket.off('betting:opened', handleBettingOpened);
+      socket.off('betting:closed', handleBettingClosed);
+      socket.off('odds:updated', handleOddsUpdated);
+      socket.off('race:countdown', handleRaceCountdown);
+      socket.off('race:started', handleRaceStarted);
+      socket.off('race:update', handleRaceUpdate);
+      socket.off('race:event', handleRaceEvent);
+      socket.off('race:finished', handleRaceFinished);
+      socket.off('coins:updated', handleCoinsUpdated);
+      socket.off('powerup:received', handlePowerUpReceived);
+      socket.off('game:error', handleGameError);
+      socket.off('session:resumed', handleSessionResumed);
       socketRef.current = null;
     };
   }, [session?.sessionToken, setCoins]);

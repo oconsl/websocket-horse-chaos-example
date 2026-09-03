@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Socket } from 'socket.io-client';
-import { createGameSocket } from '@/lib/socket';
+import Link from 'next/link';
+import { getGameSocket } from '@/lib/socket';
 import { useSessionStore } from '@/store/session';
 import { useHydrateSession } from '@/lib/useHydrateSession';
 
@@ -26,7 +26,6 @@ export default function LobbyPage() {
 
   const [lobby, setLobby] = useState<LobbySnapshot | null>(null);
   const [socketError, setSocketError] = useState<string | null>(null);
-  const socketRef = useRef<Socket | null>(null);
 
   // Redirect to /join once we know (post-hydration) there's no session.
   useEffect(() => {
@@ -35,26 +34,29 @@ export default function LobbyPage() {
     }
   }, [hasHydrated, session, router]);
 
-  // Open the socket once we have a session token.
+  // Reuse the shared socket and just add/remove this page's own listeners —
+  // never open/close a connection here (see lib/socket.ts).
   useEffect(() => {
     if (!session?.sessionToken) return;
 
-    const socket = createGameSocket(session.sessionToken);
-    socketRef.current = socket;
+    const socket = getGameSocket(session.sessionToken);
 
-    socket.on('lobby:update', (snapshot: LobbySnapshot) => {
+    function handleLobbyUpdate(snapshot: LobbySnapshot) {
       setLobby(snapshot);
-    });
+    }
 
-    socket.on('game:error', (payload: { message?: string }) => {
+    function handleGameError(payload: { message?: string }) {
       setSocketError(payload?.message ?? 'Error de sesión');
       clearSession();
       router.replace('/join');
-    });
+    }
+
+    socket.on('lobby:update', handleLobbyUpdate);
+    socket.on('game:error', handleGameError);
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      socket.off('lobby:update', handleLobbyUpdate);
+      socket.off('game:error', handleGameError);
     };
   }, [session?.sessionToken, clearSession, router]);
 
@@ -90,9 +92,20 @@ export default function LobbyPage() {
         ))}
       </ul>
 
-      <a className="race-link" href="/race">
-        Ir a la carrera →
-      </a>
+      <div className="lobby-nav">
+        {/*
+          Client-side navigation via next/link, not a plain <a> — a full
+          page reload would tear down the shared socket module and defeat
+          the single-socket fix (the whole point is to KEEP the connection
+          alive across /lobby <-> /race navigation).
+        */}
+        <Link className="race-link" href="/race">
+          Ir a la carrera →
+        </Link>
+        <Link className="race-link" href="/leaderboard">
+          🏆 Tabla de posiciones
+        </Link>
+      </div>
     </main>
   );
 }
