@@ -1,14 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { API_URL } from '@/lib/config';
+import { useSessionStore } from '@/store/session';
+import { useHydrateSession } from '@/lib/useHydrateSession';
 
 /**
  * Minimal, unstyled host/admin panel — just enough to drive open-betting /
- * close-betting for the classroom demo. The full host panel mockup comes
- * in a later phase; no auth is required, matching the admin REST routes.
+ * close-betting for the classroom demo. Gated by AdminGuard on the API side
+ * (player.isAdmin), sent via the same x-session-token header as /races.
  */
 export default function HostPage() {
+  const router = useRouter();
+  const hasHydrated = useHydrateSession();
+  const session = useSessionStore((state) => state.session);
+
   const [raceId, setRaceId] = useState('');
   const [status, setStatus] = useState('');
   const [log, setLog] = useState<string[]>([]);
@@ -18,14 +25,17 @@ export default function HostPage() {
   }
 
   async function call(path: string, options?: RequestInit) {
+    if (!session) return null;
+
     try {
       const res = await fetch(`${API_URL}${path}`, {
         method: 'POST',
+        headers: { 'x-session-token': session.sessionToken },
         ...options,
       });
       const data = await res.json();
       appendLog(`${res.status} ${path} -> ${JSON.stringify(data)}`);
-      return data;
+      return res.ok ? data : null;
     } catch (err) {
       appendLog(`ERROR ${path} -> ${String(err)}`);
       return null;
@@ -58,9 +68,31 @@ export default function HostPage() {
     if (data?.status) setStatus(data.status);
   }
 
+  if (!hasHydrated) {
+    return (
+      <main style={{ padding: '2rem', paddingTop: '3.75rem' }}>
+        <p>Cargando...</p>
+      </main>
+    );
+  }
+
+  if (!session) {
+    return (
+      <main style={{ padding: '2rem', paddingTop: '3.75rem' }}>
+        <p>
+          Necesitás iniciar sesión con una cuenta admin.{' '}
+          <button type="button" onClick={() => router.push('/join')}>
+            Ir a /join
+          </button>
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main style={{ padding: '2rem', paddingTop: '3.75rem', fontFamily: 'monospace' }}>
       <h1>Host panel (demo)</h1>
+      <p>Logueado como: {session.username}</p>
       <p>Race ID: {raceId || '(none)'}</p>
       <p>Status: {status || '(none)'}</p>
 
