@@ -29,6 +29,7 @@ interface UsePowerUpPort {
     playerId: string,
     dto: { powerupId: string; lane: number },
   ): Promise<{ result: 'applied' | 'blocked' }>;
+  getResumeSnapshot(playerId: string): Promise<unknown>;
 }
 
 @WebSocketGateway({
@@ -69,6 +70,25 @@ export class GameGateway {
       const message = err instanceof Error ? err.message : 'No se pudo usar el poder';
       client.emit('game:error', { message });
     }
+  }
+
+  /**
+   * Session resume (design doc §16): a client fires this right after
+   * connecting or auto-reconnecting. Identity is resolved the same way as
+   * every other event — via the sessionToken-derived player mapping in
+   * PlayersService, never via socket.id — so a refresh or dropped connection
+   * never loses the player's coins, bet, power-ups, or race position.
+   */
+  @SubscribeMessage('session:resume')
+  async handleSessionResume(@ConnectedSocket() client: Socket) {
+    const playerId = this.playersService.getPlayerIdForSocket(client.id);
+    if (!playerId) {
+      client.emit('game:error', { message: 'Not authenticated' });
+      return;
+    }
+
+    const snapshot = await this.gameService.getResumeSnapshot(playerId);
+    client.emit('session:resumed', snapshot);
   }
 
   emitBettingOpened(payload: { raceId: string; odds: OddsSnapshot }) {
@@ -127,5 +147,12 @@ export class GameGateway {
     for (const socketId of socketIds) {
       this.server.to(socketId).emit('powerup:received', payload);
     }
+  }
+
+  /** Broadcast: top-coins standings, refreshed after every race's payouts settle. */
+  emitLeaderboardUpdated(payload: {
+    leaderboard: { rank: number; playerId: string; username: string; coins: number }[];
+  }) {
+    this.server.emit('leaderboard:updated', payload);
   }
 }

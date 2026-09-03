@@ -11,7 +11,18 @@ export class PlayersService {
   /** socketId -> connected player info (cached, not re-fetched from DB) */
   private readonly connections = new Map<string, ConnectedPlayer>();
 
+  /**
+   * Registers a socket for a player, replacing any prior mapping(s) for that
+   * SAME player. `socket.id` is never treated as identity: on reconnect the
+   * player gets a brand new socket.id, and we must not accumulate a stale
+   * entry for the old (possibly not-yet-disconnected) socket alongside it.
+   */
   registerConnection(socketId: string, player: ConnectedPlayer): void {
+    for (const [existingSocketId, existingPlayer] of this.connections) {
+      if (existingPlayer.playerId === player.playerId && existingSocketId !== socketId) {
+        this.connections.delete(existingSocketId);
+      }
+    }
     this.connections.set(socketId, player);
   }
 

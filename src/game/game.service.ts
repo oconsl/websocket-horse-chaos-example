@@ -19,6 +19,7 @@ import {
   RaceEngineHandle,
   type HorseFinish,
   type PowerUpEffectType,
+  type RaceHorseSnapshot,
 } from './race-engine.service.js';
 import { PlayersService } from '../players/players.service.js';
 
@@ -65,6 +66,9 @@ interface GameGatewayPort {
     socketIds: string[],
     payload: { raceId: string; powerUps: { id: string; type: string }[] },
   ): void;
+  emitLeaderboardUpdated(payload: {
+    leaderboard: { rank: number; playerId: string; username: string; coins: number }[];
+  }): void;
 }
 
 /** Countdown broadcast before RACING begins, server-timed (no admin click). */
@@ -418,6 +422,69 @@ export class GameService implements OnModuleInit {
       raceId,
       standings: finishes.slice().sort((a, b) => a.place - b.place),
     });
+
+    // Standings can shift after every race's payouts settle — refresh live
+    // for anyone with the leaderboard open.
+    const leaderboard = await this.getLeaderboard();
+    this.gameGateway.emitLeaderboardUpdated({ leaderboard });
+  }
+
+  /** Top players by coins, descending. Public — no auth required. */
+  async getLeaderboard(limit = 20) {
+    const players = await this.prisma.player.findMany({
+      orderBy: { coins: 'desc' },
+      take: limit,
+      select: { id: true, username: true, coins: true },
+    });
+
+    return players.map((player, index) => ({
+      rank: index + 1,
+      playerId: player.id,
+      username: player.username,
+      coins: player.coins,
+    }));
+  }
+
+  /**
+   * Session resume (design doc §16): everything a reconnecting player needs
+   * to rehydrate their view without waiting for the next live tick. Entirely
+   * read from server state keyed by playerId — the client never asserts its
+   * own coins/bet/power-ups, it only ever receives this snapshot.
+   */
+  async getResumeSnapshot(playerId: string) {
+    if (!this.currentRaceId) {
+      return { race: null, myBet: null, powerUps: [], horsePositions: [], results: null };
+    }
+
+    const raceId = this.currentRaceId;
+    const snapshot = await this.buildRaceSnapshot(raceId);
+
+    const [bet, powerUps] = await Promise.all([
+      this.prisma.bet.findUnique({ where: { playerId_raceId: { playerId, raceId } } }),
+      this.prisma.playerPowerUp.findMany({
+        where: { playerId, raceId },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+
+    const horsePositions: RaceHorseSnapshot[] =
+      snapshot.status === RaceStatus.RACING && this.currentRaceEngineHandle
+        ? this.currentRaceEngineHandle.snapshot()
+        : [];
+
+    let results: Awaited<ReturnType<GameService['getRaceResults']>> | null = null;
+    if (snapshot.status === RaceStatus.RESULTS) {
+      const player = await this.prisma.player.findUnique({ where: { id: playerId } });
+      results = await this.getRaceResults(raceId, player);
+    }
+
+    return {
+      race: { id: snapshot.id, status: snapshot.status, odds: snapshot.odds },
+      myBet: bet ? { horseId: bet.horseId, amount: bet.amount } : null,
+      powerUps: powerUps.map((p) => ({ id: p.id, type: p.type, used: p.used })),
+      horsePositions,
+      results,
+    };
   }
 
   async getRaceResults(raceId: string, player: Player | null) {

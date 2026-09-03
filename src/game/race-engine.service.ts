@@ -128,6 +128,19 @@ export class RaceEngineHandle {
     this.effectsByLane.set(lane, live);
     return live;
   }
+
+  /**
+   * Current live positions for every lane — used to rehydrate a reconnecting
+   * player mid-race instead of leaving their track blank until the next
+   * `race:update` tick.
+   */
+  snapshot(): RaceHorseSnapshot[] {
+    return this.state.map((h) => ({
+      lane: h.lane,
+      position: Math.round(h.position * 100) / 100,
+      speed: Math.round(h.effectiveVelocity * 100) / 100,
+    }));
+  }
 }
 
 /** Deterministic string seed -> 32-bit int seed for mulberry32. */
