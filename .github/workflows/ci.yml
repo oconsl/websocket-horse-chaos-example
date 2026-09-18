@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API (NestJS)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+    env:
+      # Placeholder only. `prisma generate` needs the variable to be present,
+      # but never opens a connection. No real database is used in CI.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+    steps:
+      - uses: actions/checkout@v4
+
+      # Installed explicitly rather than via corepack: the repo root has no
+      # `packageManager` field, so the corepack shim cannot resolve a version there.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: api/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: api/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Unit tests
+        run: pnpm run test
+
+  web:
+    name: Web (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

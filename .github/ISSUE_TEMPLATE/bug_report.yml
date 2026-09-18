@@ -1,0 +1,58 @@
+name: Bug report
+description: Report something that does not work as expected
+labels: ['bug']
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - api
+        - web
+        - both
+        - infrastructure / tooling
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Describe the actual behaviour, including any error output.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node version, browser, and how you are running the stack.
+      placeholder: 'macOS 15, Node 22.11, Chrome 140, docker compose'
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: no-secrets
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have removed any credentials, tokens, or personal data from this report.
+          required: true

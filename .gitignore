@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+
+# Environment — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Test output
+coverage/
+.nyc_output/
+
+# Tooling caches
+.codegraph/
+.turbo/
+.cache/
+.eslintcache
+
+# Local agent/assistant tooling — machine-specific, not part of the project
+.atl/
+.claude/
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
