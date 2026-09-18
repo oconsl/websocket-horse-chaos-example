@@ -1,0 +1,107 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Player {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  sessionToken String   @unique
+  coins        Int      @default(1000)
+  isAdmin      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  bets         Bet[]
+  powerUps     PlayerPowerUp[]
+}
+
+enum RaceStatus {
+  WAITING
+  BETTING
+  BETTING_CLOSED
+  COUNTDOWN
+  RACING
+  RESULTS
+}
+
+enum PowerUpType {
+  TURBO
+  SLOW
+  BOMB
+  SHIELD
+}
+
+model Race {
+  id         String      @id @default(uuid())
+  status     RaceStatus  @default(WAITING)
+  seed       String
+  createdAt  DateTime    @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+  /**
+   * Odds snapshot taken the moment betting closes (see odds.ts OddsSnapshot),
+   * persisted so payouts settle against the price bettors actually saw —
+   * never against odds that drift while the race is running.
+   */
+  finalOdds  Json?
+  horses     RaceHorse[]
+  bets       Bet[]
+  powerUps   PlayerPowerUp[]
+}
+
+model Horse {
+  id           String      @id @default(uuid())
+  name         String      @unique
+  speed        Int         @default(50)
+  acceleration Int         @default(50)
+  stamina      Int         @default(50)
+  chaos        Int         @default(50)
+  raceHorses   RaceHorse[]
+}
+
+model RaceHorse {
+  id             String  @id @default(uuid())
+  raceId         String
+  race           Race    @relation(fields: [raceId], references: [id])
+  horseId        String
+  horse          Horse   @relation(fields: [horseId], references: [id])
+  lane           Int
+  finishPosition Int?
+
+  @@unique([raceId, lane])
+  @@unique([raceId, horseId])
+}
+
+model PlayerPowerUp {
+  id         String      @id @default(uuid())
+  playerId   String
+  player     Player      @relation(fields: [playerId], references: [id])
+  raceId     String
+  race       Race        @relation(fields: [raceId], references: [id])
+  type       PowerUpType
+  used       Boolean     @default(false)
+  targetLane Int?
+  usedAt     DateTime?
+  createdAt  DateTime    @default(now())
+}
+
+model Bet {
+  id        String   @id @default(uuid())
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id])
+  raceId    String
+  race      Race     @relation(fields: [raceId], references: [id])
+  horseId   String
+  amount    Int
+  /** Coins credited for this bet at settlement — null until the race finishes, 0 for a loss. */
+  payout    Int?
+  createdAt DateTime @default(now())
+
+  @@unique([playerId, raceId])
+}
