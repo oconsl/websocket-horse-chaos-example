@@ -25,7 +25,7 @@ jobs:
       # but never opens a connection. No real database is used in CI.
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Installed explicitly rather than via corepack: the repo root has no
       # `packageManager` field, so the corepack shim cannot resolve a version there.
@@ -61,7 +61,7 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
