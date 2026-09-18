@@ -1,0 +1,6 @@
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 12px;
+  padding: 1.25rem;
+}

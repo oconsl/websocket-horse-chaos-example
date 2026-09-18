@@ -1,0 +1,31 @@
+.button {
+  padding: 0.65rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.primary {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: rgba(128, 128, 128, 0.4);
+}
