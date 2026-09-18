@@ -1,7 +1,10 @@
 {
-  "name": "web",
+  "name": "@horse-chaos/web",
   "version": "0.1.0",
+  "description": "Real-time multiplayer horse-racing betting UI built with Next.js, React and Socket.IO",
+  "author": "Santiago Luis Ocón",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
