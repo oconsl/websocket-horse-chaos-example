@@ -29,7 +29,7 @@ jobs:
 
       # Installed explicitly rather than via corepack: the repo root has no
       # `packageManager` field, so the corepack shim cannot resolve a version there.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: api/package.json
 
