@@ -225,7 +225,7 @@ export default function RacePage() {
     function handleRaceEvent(payload: RaceEventPayload) {
       setEvents((prev) => [payload, ...prev].slice(0, 30));
       // Server-authoritative: we optimistically mark a power-up used the
-      // moment we emit `powerup:use` (see usePowerUp below); this just
+      // moment we emit `powerup:use` (see activatePowerUp below); this just
       // clears the pending flag once the server confirms.
       pendingPowerUpIdRef.current = null;
     }
@@ -336,9 +336,15 @@ export default function RacePage() {
     if (!latest || typeof latest.lane !== 'number') return;
     if (!latest.type.startsWith('powerup.')) return;
 
-    setHitLane(latest.lane);
+    // Scheduled on the next frame rather than set synchronously, so the flash
+    // never triggers a cascading render while the effect is still running.
+    const { lane } = latest;
+    const frame = requestAnimationFrame(() => setHitLane(lane));
     const timeout = setTimeout(() => setHitLane(null), 450);
-    return () => clearTimeout(timeout);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timeout);
+    };
   }, [events]);
 
   const maxBet = useMemo(() => {
@@ -346,7 +352,7 @@ export default function RacePage() {
     return Math.max(BET_STEP, Math.floor(coins / BET_STEP) * BET_STEP);
   }, [session?.coins]);
 
-  function usePowerUp(powerUpId: string) {
+  function activatePowerUp(powerUpId: string) {
     if (!selectedLane || !socketRef.current) return;
     setPowerUpError(null);
     setUsedPowerUpIds((prev) => new Set(prev).add(powerUpId));
@@ -588,7 +594,7 @@ export default function RacePage() {
                             <Button
                               className="powerup-submit"
                               disabled={!selectedLane}
-                              onClick={() => usePowerUp(powerUp.id)}
+                              onClick={() => activatePowerUp(powerUp.id)}
                             >
                               USAR
                             </Button>

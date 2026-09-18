@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark";
 
@@ -20,15 +20,26 @@ function resolveSystemTheme(): Theme {
     : "light";
 }
 
-export function ThemeToggle() {
-  const [mounted, setMounted] = useState(false);
-  const [theme, setTheme] = useState<Theme>("light");
+function readInitialTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+  const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
+  return stored ?? resolveSystemTheme();
+}
 
-  useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
-    setTheme(stored ?? resolveSystemTheme());
-    setMounted(true);
-  }, []);
+// `false` on the server and during hydration, `true` on every render after it.
+// This keeps the first client render byte-identical to the server's without
+// setting state from inside an effect.
+const subscribeToNothing = () => () => {};
+const getMountedSnapshot = () => true;
+const getServerSnapshot = () => false;
+
+export function ThemeToggle() {
+  const mounted = useSyncExternalStore(
+    subscribeToNothing,
+    getMountedSnapshot,
+    getServerSnapshot,
+  );
+  const [theme, setTheme] = useState<Theme>(readInitialTheme);
 
   const toggle = () => {
     const next: Theme = theme === "dark" ? "light" : "dark";
