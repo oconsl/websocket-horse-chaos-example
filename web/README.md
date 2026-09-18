@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Horse Chaos — Web
 
-## Getting Started
+The Next.js frontend for [Horse Chaos](../README.md). It renders the lobby, the live
+race, betting, power-ups, and the leaderboard. It never simulates anything — the
+server owns the truth and this client draws it.
 
-First, run the development server:
+> Start with the [root README](../README.md) for the architecture overview, the full
+> HTTP and WebSocket reference, and the game rules. This file covers only how to run
+> and work on the web app.
+
+## Stack
+
+Next.js 16 (App Router) · React 19 · zustand 5 · socket.io-client 4 · TypeScript · Node 22 · npm
+
+## Setup
+
+Start the [API](../api/README.md) first, then:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev -- -p 3001           # http://localhost:3001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+> **⚠️ Port collision.** The API defaults to `3000` and so does `next dev`. Run the
+> web app on another port as above, or move the API with its `PORT` variable and
+> point `NEXT_PUBLIC_API_URL` at the new address.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command         | Purpose                        |
+| --------------- | ------------------------------ |
+| `npm run dev`   | Development server             |
+| `npm run build` | Production build               |
+| `npm run start` | Serve the production build     |
+| `npm run lint`  | ESLint (`eslint-config-next`)  |
 
-## Learn More
+## Environment
 
-To learn more about Next.js, take a look at the following resources:
+| Variable              | Required | Default                 | Purpose                             |
+| --------------------- | -------- | ----------------------- | ----------------------------------- |
+| `NEXT_PUBLIC_API_URL` | —        | `http://localhost:3000` | Base URL for REST **and** Socket.IO |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Set it in `web/.env.local`, which is git-ignored.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Routes
 
-## Deploy on Vercel
+| Route          | Purpose                                                                       |
+| -------------- | ----------------------------------------------------------------------------- |
+| `/`            | Hydrates the stored session, then redirects to `/lobby` or `/join`             |
+| `/join`        | Login and registration                                                         |
+| `/lobby`       | Live connected players, coin balance, navigation                               |
+| `/race`        | The main screen: betting, live track, power-ups, event feed, results           |
+| `/leaderboard` | Top players, live-updating after every race                                    |
+| `/host`        | Admin panel to drive a race (requires `isAdmin`)                               |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Layout
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+app/          route segments (join, lobby, race, leaderboard, host)
+components/   UI kit and shared visual components
+lib/          socket.ts (shared Socket.IO singleton) and config.ts
+store/        zustand session store, persisted to localStorage
+```
+
+## Two things to know before editing
+
+1. **There is exactly one socket per tab.** `lib/socket.ts` holds a module-level
+   singleton. Do not call `io()` inside a page — creating a socket per page caused
+   duplicate targeted emits. This is also why navigation uses `next/link` rather
+   than full page loads: it keeps the connection alive.
+
+2. **The session store hydrates manually.** `store/session.ts` uses zustand
+   `persist` with `skipHydration: true`; `lib/useHydrateSession.ts` drives
+   hydration so server and client renders stay consistent.
+
+## License
+
+[MIT](../LICENSE)
